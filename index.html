@@ -24,7 +24,7 @@
             border-radius: 8px;
             font-size: 13px;
             border: 1px solid #2a2a45;
-            min-width: 200px;
+            z-index: 100;
         }
         #ui h3 {
             color: #00f2ff;
@@ -38,15 +38,43 @@
         }
         .stat-label { color: #b0b0d0; }
         .stat-value { color: #00ff9d; font-weight: bold; }
-        .status {
+        #status {
             margin-top: 10px;
             padding: 8px;
             border-radius: 4px;
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
             font-size: 11px;
         }
-        .status.ok { background: rgba(0, 255, 157, 0.2); color: #00ff9d; }
-        .status.error { background: rgba(255, 85, 119, 0.2); color: #ff5577; }
-        .status.loading { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+        #errorBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90%;
+            width: 500px;
+            background: rgba(255, 85, 119, 0.95);
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 1000;
+            border: 2px solid #ff5577;
+            box-shadow: 0 0 20px rgba(255, 85, 119, 0.5);
+        }
+        #errorBox h2 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        #errorBox pre {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
         button {
             margin-top: 10px;
             padding: 10px 20px;
@@ -60,18 +88,6 @@
         }
         button:hover { background: #00c4d4; }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
-        #errorBox {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            max-width: 400px;
-            background: rgba(255, 85, 119, 0.9);
-            color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 12px;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -91,64 +107,81 @@
             <span class="stat-label">FPS:</span>
             <span class="stat-value" id="fpsStat">0</span>
         </div>
-        <div class="stat">
-            <span class="stat-label">Brains:</span>
-            <span class="stat-value" id="brainStat">0</span>
-        </div>
-        <div id="statusBox" class="status loading">⏳ Loading...</div>
+        <div id="status">⏳ Loading...</div>
         <button id="btnStart" disabled>▶ Start</button>
         <button id="btnReset" disabled>🔄 Reset</button>
     </div>
 
-    <div id="errorBox"></div>
+    <div id="errorBox" style="display: none;">
+        <h2>❌ ERROR</h2>
+        <div id="errorMsg"></div>
+        <pre id="errorStack"></pre>
+        <button onclick="document.getElementById('errorBox').style.display='none'" style="margin-top: 15px;">Close</button>
+    </div>
+
+    <script>
+        // === ПОКАЗАТЬ ОШИБКУ ===
+        function showError(title, message, stack) {
+            document.getElementById('errorBox').style.display = 'block';
+            document.getElementById('errorMsg').innerHTML = '<strong>' + title + '</strong><br><br>' + message;
+            document.getElementById('errorStack').textContent = stack || '';
+            document.getElementById('status').textContent = '❌ Error';
+            document.getElementById('status').style.background = 'rgba(255, 85, 119, 0.2)';
+            document.getElementById('status').style.color = '#ff5577';
+        }
+
+        // === ПЕРЕХВАТ ВСЕХ ОШИБОК ===
+        window.onerror = function(msg, url, line, col, error) {
+            showError('JavaScript Error', msg, error ? error.stack : 'Line ' + line);
+            return false;
+        };
+
+        window.addEventListener('unhandledrejection', function(event) {
+            showError('Promise Error', event.reason, event.reason ? event.reason.stack : '');
+        });
+
+        console.log('=== AI Arena Starting ===');
+    </script>
 
     <script type="module">
-        // === ГЛОБАЛЬНЫЙ ПЕРЕХОВАТ ОШИБОК ===
-        const errorBox = document.getElementById('errorBox');
-        const statusBox = document.getElementById('statusBox');
-        
-        function showError(msg) {
-            errorBox.style.display = 'block';
-            errorBox.innerHTML = '<strong>❌ ERROR:</strong><br><br>' + msg.replace(/\n/g, '<br>');
-            statusBox.className = 'status error';
-            statusBox.textContent = '❌ Error';
-        }
-
-        function setStatus(msg, type) {
-            statusBox.textContent = msg;
-            statusBox.className = 'status ' + type;
-        }
-
         try {
-            // === 1. ПОДКЛЮЧЕНИЕ К CORTEX.JS ===
-            setStatus('📦 Loading Cortex2Brain...', 'loading');
+            console.log('Step 1: Importing Cortex2Brain from ./core/cortex.js');
+            document.getElementById('status').textContent = '📦 Loading Cortex...';
+            
             const cortexModule = await import('./core/cortex.js');
             const { Cortex2Brain } = cortexModule;
-            setStatus('✅ Cortex2Brain loaded!', 'ok');
-            document.getElementById('brainStat').textContent = '1';
+            console.log('✅ Cortex2Brain loaded:', Cortex2Brain);
+            document.getElementById('status').textContent = '✅ Cortex loaded!';
 
-            // === 2. ПОДКЛЮЧЕНИЕ К GAME.JS ===
-            setStatus('📦 Loading GameEngine...', 'loading');
+            console.log('Step 2: Importing GameEngine from ./game.js');
+            document.getElementById('status').textContent = '📦 Loading Game...';
+            
             const gameModule = await import('./game.js');
             const { GameEngine } = gameModule;
-            setStatus('✅ GameEngine loaded!', 'ok');
+            console.log('✅ GameEngine loaded:', GameEngine);
+            document.getElementById('status').textContent = '✅ Game loaded!';
 
-            // === 3. ИНИЦИАЛИЗАЦИЯ ===
-            setStatus('🎮 Initializing engine...', 'loading');
+            console.log('Step 3: Initializing canvas');
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            console.log('Canvas size:', canvas.width, 'x', canvas.height);
 
+            console.log('Step 4: Creating engine');
+            document.getElementById('status').textContent = '🎮 Creating engine...';
+            
             const engine = await new GameEngine({
                 width: canvas.width,
                 height: canvas.height,
                 seed: 'arena_1'
             }).init();
-            setStatus('✅ Engine ready!', 'ok');
+            console.log('✅ Engine created:', engine);
+            document.getElementById('status').textContent = '✅ Engine ready!';
 
-            // === 4. СОЗДАНИЕ АГЕНТОВ ===
-            setStatus('🤖 Creating agents...', 'loading');
+            console.log('Step 5: Adding agents');
+            document.getElementById('status').textContent = '🤖 Creating agents...';
+            
             engine.addAgent({
                 id: 'blue',
                 x: 200,
@@ -164,11 +197,14 @@
                 color: '#ff5577',
                 stats: { maxHealth: 100, damage: 3, speed: 22 }
             });
+            
             document.getElementById('agentStat').textContent = engine.agents.size;
-            setStatus('✅ Agents created!', 'ok');
+            console.log('✅ Agents created:', engine.agents.size);
+            document.getElementById('status').textContent = '✅ Agents ready!';
 
-            // === 5. СОЗДАНИЕ МОЗГОВ (CORTEX) ===
-            setStatus('🧠 Creating Cortex brains...', 'loading');
+            console.log('Step 6: Creating brains');
+            document.getElementById('status').textContent = '🧠 Creating brains...';
+            
             const brains = new Map();
             for (const [id, agent] of engine.agents) {
                 const brain = new Cortex2Brain({
@@ -190,10 +226,10 @@
 
                 brains.set(id, brain);
             }
-            document.getElementById('brainStat').textContent = brains.size;
-            setStatus('✅ Brains connected to Cortex!', 'ok');
+            console.log('✅ Brains created:', brains.size);
+            document.getElementById('status').textContent = '✅ Brains ready!';
 
-            // === 6. GAME LOOP ===
+            // Game loop
             let running = false;
             let lastTime = 0;
             let frameCount = 0;
@@ -205,42 +241,48 @@
                 const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
                 lastTime = timestamp;
 
-                engine.step(dt);
+                try {
+                    engine.step(dt);
 
-                // AI DECISIONS THROUGH CORTEX
-                for (const [id, agent] of engine.agents) {
-                    if (!agent.alive) continue;
-                    const brain = brains.get(id);
-                    if (!brain) continue;
-                    
-                    const sensors = getSensors(agent, engine);
-                    const result = brain.forward(sensors, 0, null, {
-                        others: getSocialContext(agent, engine)
-                    });
+                    for (const [id, agent] of engine.agents) {
+                        if (!agent.alive) continue;
+                        const brain = brains.get(id);
+                        if (!brain) continue;
+                        
+                        const sensors = getSensors(agent, engine);
+                        const result = brain.forward(sensors, 0, null, {
+                            others: getSocialContext(agent, engine)
+                        });
 
-                    agent.setThrottle(result.output[4]);
-                    agent.setSteering(result.output[8]);
-                    if (result.output[6] > 0.7) {
-                        agent.requestAttack();
+                        agent.setThrottle(result.output[4]);
+                        agent.setSteering(result.output[8]);
+                        if (result.output[6] > 0.7) {
+                            agent.requestAttack();
+                        }
                     }
-                }
 
-                engine.render(ctx, { showGrid: true, showTrail: true });
+                    engine.render(ctx, { showGrid: true, showTrail: true });
 
-                frameCount++;
-                if (frameCount % 30 === 0) {
-                    fps = Math.round(1 / dt);
-                    document.getElementById('stepStat').textContent = engine.stepCount;
-                    document.getElementById('fpsStat').textContent = fps;
+                    frameCount++;
+                    if (frameCount % 30 === 0) {
+                        fps = Math.round(1 / dt);
+                        document.getElementById('stepStat').textContent = engine.stepCount;
+                        document.getElementById('fpsStat').textContent = fps;
+                    }
+                } catch (e) {
+                    console.error('Game loop error:', e);
+                    showError('Game Loop Error', e.message, e.stack);
                 }
 
                 requestAnimationFrame(gameLoop);
             }
 
-            // === 7. CONTROLS ===
+            // Controls
             document.getElementById('btnStart').disabled = false;
             document.getElementById('btnReset').disabled = false;
-            setStatus('✅ READY! Press Start', 'ok');
+            document.getElementById('status').textContent = '✅ READY! Press Start';
+            document.getElementById('status').style.background = 'rgba(0, 255, 157, 0.2)';
+            document.getElementById('status').style.color = '#00ff9d';
 
             document.getElementById('btnStart').onclick = () => {
                 running = !running;
@@ -248,10 +290,10 @@
                     lastTime = performance.now();
                     requestAnimationFrame(gameLoop);
                     document.getElementById('btnStart').textContent = '⏸ Pause';
-                    setStatus('▶ Running', 'ok');
+                    document.getElementById('status').textContent = '▶ Running';
                 } else {
                     document.getElementById('btnStart').textContent = '▶ Start';
-                    setStatus('⏸ Paused', 'loading');
+                    document.getElementById('status').textContent = '⏸ Paused';
                 }
             };
 
@@ -260,7 +302,7 @@
                 for (const brain of brains.values()) {
                     brain.resetEpisode();
                 }
-                setStatus('🔄 Reset', 'ok');
+                document.getElementById('status').textContent = '🔄 Reset';
             };
 
             window.addEventListener('resize', () => {
@@ -282,7 +324,6 @@
                 }
             };
 
-            // Helpers
             function getSensors(agent, engine) {
                 const sensors = new Array(64).fill(0);
                 let nearestEnemy = null, nearestDist = Infinity;
@@ -335,11 +376,13 @@
                 return { others, enemyId: others[0]?.id };
             }
 
+            console.log('=== All initialized successfully! ===');
+
         } catch (error) {
-            showError(error.message + '\n\n' + error.stack);
+            console.error('Initialization error:', error);
+            showError('Initialization Failed', error.message, error.stack);
         }
     </script>
 </body>
 </html>
-
 
