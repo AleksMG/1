@@ -1954,3 +1954,4 @@ if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
 
 // ES Module (default)
 export { Cortex2Brain, SeededRNG };
+ 
