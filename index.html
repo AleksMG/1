@@ -3,879 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vigenère Breaker Pro</title>
+    <title>AI Arena v2.1 — Production</title>
     <style>
-        :root {
-            --primary: #4285F4;
-            --secondary: #34A853;
-            --danger: #EA4335;
-            --dark: #202124;
-            --light: #F8F9FA;
-            --gray: #5F6368;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Roboto', sans-serif;
-            background: var(--dark);
-            color: var(--light);
-            margin: 0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .panel {
-            background: #2D2E30;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        h2 {
-            margin-top: 0;
-            color: var(--primary);
-            font-weight: 500;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--light);
-        }
-
-        input[type="text"], textarea, select {
-            width: 100%;
-            padding: 12px;
-            background: #3C4043;
-            border: 1px solid #5F6368;
-            color: var(--light);
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        textarea {
-            min-height: 200px;
-            resize: vertical;
-            font-family: 'Consolas', monospace;
-        }
-
-        .range-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        input[type="range"] {
-            flex: 1;
-            height: 6px;
-            background: #5F6368;
-            border-radius: 3px;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            background: var(--primary);
-            border-radius: 50%;
-            cursor: pointer;
-        }
-
-        .btn-group {
-            display: grid;
-            gap: 10px;
-            margin: 20px 0;
-        }
-
-        button {
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-success {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .progress-container {
-            margin: 20px 0;
-        }
-
-        .progress-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .progress-bar {
-            height: 8px;
-            background: #3C4043;
-            border-radius: 4px;
+            background: #0a0a15;
+            color: #e0e0ff;
+            font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
         }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--secondary);
-            border-radius: 4px;
-            transition: width 0.3s;
-            width: 0%;
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
         }
-
-        .stats {
-            background: #3C4043;
-            padding: 15px;
-            border-radius: 4px;
-            margin-top: 20px;
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(18, 18, 37, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #2a2a45;
         }
-
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
+        #ui h3 {
+            color: #00f2ff;
             margin-bottom: 8px;
             font-size: 14px;
         }
-
-        .stat-value {
-            font-weight: 500;
-            color: var(--primary);
-        }
-
-        .results-container {
-            height: calc(100vh - 100px);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .result-item {
-            background: #3C4043;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            border-left: 4px solid var(--primary);
-        }
-
-        .result-item.best {
-            border-left-color: var(--secondary);
-            background: rgba(52, 168, 83, 0.1);
-        }
-
-        .result-header {
+        .stat {
+            margin: 4px 0;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
+            gap: 20px;
         }
-
-        .result-key {
-            font-weight: 700;
-            color: var(--primary);
-            font-size: 16px;
-        }
-
-        .result-score {
-            background: rgba(0,0,0,0.3);
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
-
-        .result-text {
-            font-family: 'Consolas', monospace;
-            white-space: pre-wrap;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
+        .stat-label { color: #b0b0d0; }
+        .stat-value { color: #00ff9d; font-weight: bold; }
+        button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #00f2ff;
+            color: #000;
+            border: none;
             border-radius: 4px;
-            overflow-x: auto;
-        }
-
-        .best .result-key {
-            color: var(--secondary);
-        }
-
-        .alert {
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .alert-error {
-            background: rgba(234, 67, 53, 0.2);
-            border-left: 4px solid var(--danger);
-            color: var(--danger);
-        }
-
-        .alert-info {
-            background: rgba(66, 133, 244, 0.2);
-            border-left: 4px solid var(--primary);
-            color: var(--primary);
-        }
-
-        .alert-warning {
-            background: rgba(244, 180, 0, 0.2);
-            border-left: 4px solid #F4B400;
-            color: #F4B400;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-        }
+            cursor: pointer;
+            font-weight: bold;        }
+        button:hover { background: #00c4d4; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="panel">
-            <h2>Параметры взлома</h2>
-            
-            <div class="alert" id="alert"></div>
-            
-            <div class="form-group">
-                <label for="alphabet">Алфавит:</label>
-                <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">
-            </div>
-            
-            <div class="form-group">
-                <label for="scoringMethod">Метод оценки:</label>
-                <select id="scoringMethod">
-                    <option value="quadgrams">Quadgram анализ (рекомендуется)</option>
-                    <option value="ic">Индекс совпадений</option>
-                    <option value="chi2">Хи-квадрат</option>
-                    <option value="combined">Комбинированный</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="workers">Количество потоков: <span id="workersValue">4</span></label>
-                <div class="range-group">
-                    <input type="range" id="workers" min="1" max="16" value="4">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="keyLength">Макс. длина ключа: <span id="keyLengthValue">6</span></label>
-                <div class="range-group">
-                    <input type="range" id="keyLength" min="1" max="12" value="6">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="resultsLimit">Лучших результатов: <span id="resultsLimitValue">10</span></label>
-                <div class="range-group">
-                    <input type="range" id="resultsLimit" min="1" max="20" value="10">
-                </div>
-            </div>
-            
-            <div class="btn-group">
-                <button id="startBtn" class="btn-primary">
-                    Начать атаку
-                </button>
-                <button id="stopBtn" class="btn-danger" disabled>
-                    Остановить
-                </button>
-                <button id="saveBtn" class="btn-success" disabled>
-                    Сохранить результаты
-                </button>
-            </div>
-            
-            <div class="progress-container">
-                <div class="progress-info">
-                    <span>Прогресс:</span>
-                    <span id="progressValue">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressBar"></div>
-                </div>
-            </div>
-            
-            <div class="stats">
-                <div class="stat-item">
-                    <span>Проверено ключей:</span>
-                    <span id="keysTested" class="stat-value">0</span>
-                </div>
-                <div class="stat-item">
-                    <span>Скорость:</span>
-                    <span id="speed" class="stat-value">0</span> keys/sec
-                </div>
-                <div class="stat-item">
-                    <span>Осталось:</span>
-                    <span id="timeLeft" class="stat-value">-</span>
-                </div>
-                <div class="stat-item">
-                    <span>Лучший результат:</span>
-                    <span id="bestScore" class="stat-value">-</span>
-                </div>
-            </div>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <h3>🎮 AI Arena v2.1</h3>
+        <div class="stat">
+            <span class="stat-label">Step:</span>
+            <span class="stat-value" id="stepStat">0</span>
         </div>
-
-        <div class="panel">
-            <h2>Результаты</h2>
-            
-            <div class="form-group">
-                <label for="ciphertext">Шифртекст:</label>
-                <textarea id="ciphertext" placeholder="Введите зашифрованный текст...">XHVSX DIHKM XBGIK BEBMG DMQXX HVSXQ WOFLS RKZSD PQC</textarea>
-            </div>
-            
-            <div class="results-container">
-                <div id="resultsContainer"></div>
-            </div>
+        <div class="stat">
+            <span class="stat-label">Agents:</span>
+            <span class="stat-value" id="agentStat">0</span>
         </div>
+        <div class="stat">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fpsStat">0</span>
+        </div>
+        <button id="btnStart">▶ Start</button>
+        <button id="btnReset">🔄 Reset</button>
     </div>
 
-    <script>
-        // ========================
-        // Основной класс приложения
-        // ========================
-        class VigenereBreakerPro {
-            constructor() {
-                this.workers = [];
-                this.isRunning = false;
-                this.startTime = 0;
-                this.keysTested = 0;
-                this.totalKeys = 0;
-                this.results = [];
-                this.bestScore = -Infinity;
-                this.resultsLimit = 10;
-                this.updateInterval = null;
-                this.completedWorkers = 0;
-                this.lastSpeedUpdate = 0;
-                this.lastSpeedKeys = 0;
-                this.currentTaskId = 0;
-            }
+    <script type="module">
+        import { GameEngine } from './game.js';
+        import { Cortex2Brain } from './core/cortex.js';
 
-            init(alphabet, workers, maxKeyLength, resultsLimit) {
-                if (!alphabet || alphabet.length < 2) {
-                    this.showAlert("Алфавит должен содержать минимум 2 символа", "error");
-                    return false;
+        // === INIT ===
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const engine = await new GameEngine({
+            width: canvas.width,
+            height: canvas.height,
+            seed: 'arena_1'
+        }).init();
+
+        // === CREATE AGENTS ===
+        engine.addAgent({
+            id: 'blue',
+            x: 200,
+            y: 300,
+            color: '#00d4ff',
+            stats: { maxHealth: 100, damage: 3, speed: 22 }
+        });
+        engine.addAgent({
+            id: 'red',
+            x: 620,
+            y: 300,
+            color: '#ff5577',
+            stats: { maxHealth: 100, damage: 3, speed: 22 }
+        });
+
+        // === CREATE BRAINS ===
+        const brains = new Map();
+        for (const [id, agent] of engine.agents) {
+            const brain = new Cortex2Brain({
+                seed: `brain_${id}`,
+                taskSpec: {
+                    inputComplexity: 0.7,
+                    temporalDepth: 0.4,
+                    socialComplexity: 0.8
                 }
+            });
 
-                this.stop();
-                
-                try {
-                    this.workers = Array.from({length: workers}, () => {
-                        const worker = new Worker(this.createWorkerUrl());
-                        worker.onmessage = (e) => this.handleWorkerMessage(e);
-                        return worker;
-                    });
-                    
-                    this.totalKeys = this.calculateTotalKeys(alphabet.length, maxKeyLength);
-                    this.resultsLimit = resultsLimit;
-                    this.results = [];
-                    this.bestScore = -Infinity;
-                    this.keysTested = 0;
-                    this.completedWorkers = 0;
-                    this.currentTaskId++;
-                    
-                    return true;
-                } catch (e) {
-                    this.showAlert(`Ошибка инициализации: ${e.message}`, "error");
-                    console.error(e);
-                    return false;
+            // Configure personality
+            brain.configurePersonality({
+                traits: {
+                    bravery: Math.random() * 0.6 + 0.2,
+                    aggression: Math.random() * 0.6 + 0.2,
+                    empathy: Math.random() * 0.5
                 }
-            }
+            });
 
-            createWorkerUrl() {
-                const workerCode = `
-                    const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                    const QUADGRAMS = {
-                        'TION':0.031404,'THER':0.026642,'NTHE':0.026317,'THAT':0.025347,
-                        'OFTH':0.024598,'FTHE':0.024373,'THES':0.023390,'WITH':0.023163,
-                        'INTH':0.021318,'ATIO':0.020796,'OTHE':0.020626,'TTHA':0.019758,
-                        'NDTH':0.019578,'ETHE':0.019373,'TOTH':0.018921,'DTHE':0.018673
-                    };
-                    const QUADGRAM_TOTAL = Object.values(QUADGRAMS).reduce((a,b) => a+b, 0);
-                    const ENGLISH_FREQ = {
-                        'A':0.08167,'B':0.01492,'C':0.02782,'D':0.04253,'E':0.12702,
-                        'F':0.02228,'G':0.02015,'H':0.06094,'I':0.06966,'J':0.00153,
-                        'K':0.00772,'L':0.04025,'M':0.02406,'N':0.06749,'O':0.07507,
-                        'P':0.01929,'Q':0.00095,'R':0.05987,'S':0.06327,'T':0.09056,
-                        'U':0.02758,'V':0.00978,'W':0.02360,'X':0.00150,'Y':0.01974,'Z':0.00074
-                    };
-                    const ENGLISH_IC = 0.0667;
-
-                    class VigenereCipher {
-                        constructor(alphabet) {
-                            this.alphabet = alphabet.toUpperCase();
-                            this.charToIndex = new Map([...this.alphabet].map((c, i) => [c, i]));
-                        }
-                        
-                        decrypt(ciphertext, key) {
-                            let plaintext = '';
-                            const keyUpper = key.toUpperCase();
-                            for (let i = 0; i < ciphertext.length; i++) {
-                                const c = ciphertext[i].toUpperCase();
-                                const cIdx = this.charToIndex.get(c);
-                                if (cIdx !== undefined) {
-                                    const kIdx = this.charToIndex.get(keyUpper[i % keyUpper.length]);
-                                    plaintext += this.alphabet[(cIdx - kIdx + this.alphabet.length) % this.alphabet.length];
-                                } else {
-                                    plaintext += c;
-                                }
-                            }
-                            return plaintext;
-                        }
-
-                        *generateKeys(maxLength) {
-                            function* generate(prefix, alphabet, maxLength) {
-                                if (prefix.length === maxLength) {
-                                    yield prefix;
-                                    return;
-                                }
-                                for (const char of alphabet) {
-                                    yield* generate(prefix + char, alphabet, maxLength);
-                                }
-                            }
-                            yield* generate('', this.alphabet, maxLength);
-                        }
-                    }
-
-                    function quadgramScore(text) {
-                        const clean = text.replace(/[^A-Z]/g, '');
-                        if (clean.length < 4) return -Infinity;
-                        
-                        let score = 0;
-                        for (let i = 0; i < clean.length - 3; i++) {
-                            const quad = clean.substr(i, 4);
-                            const prob = QUADGRAMS[quad] || 1e-10;
-                            score += Math.log10(prob / QUADGRAM_TOTAL);
-                        }
-                        return score / (clean.length - 3);
-                    }
-
-                    function indexOfCoincidence(text) {
-                        const clean = text.replace(/[^A-Z]/g, '');
-                        if (clean.length < 2) return 0;
-                        
-                        const counts = new Map();
-                        for (const c of clean) {
-                            counts.set(c, (counts.get(c) || 0) + 1);
-                        }
-                        
-                        let sum = 0;
-                        for (const count of counts.values()) {
-                            sum += count * (count - 1);
-                        }
-                        
-                        const ic = sum / (clean.length * (clean.length - 1));
-                        return 1 - Math.abs(ic - ENGLISH_IC);
-                    }
-
-                    function chiSquared(text) {
-                        const clean = text.replace(/[^A-Z]/g, '');
-                        if (clean.length < 5) return Infinity;
-                        
-                        const counts = new Map();
-                        for (const c of clean) {
-                            counts.set(c, (counts.get(c) || 0) + 1);
-                        }
-                        
-                        let chi2 = 0;
-                        for (const [char, freq] of Object.entries(ENGLISH_FREQ)) {
-                            const expected = freq * clean.length;
-                            const observed = counts.get(char) || 0;
-                            chi2 += Math.pow(observed - expected, 2) / expected;
-                        }
-                        
-                        return chi2;
-                    }
-
-                    self.onmessage = function(e) {
-                        const { type, taskId, alphabet, ciphertext, maxKeyLength, method, start, end } = e.data;
-                        
-                        if (type === 'start') {
-                            const cipher = new VigenereCipher(alphabet);
-                            const results = [];
-                            let processed = 0;
-                            let batchResults = [];
-                            
-                            // Генерация ключей в заданном диапазоне
-                            const generator = cipher.generateKeys(maxKeyLength);
-                            let index = 0;
-                            
-                            for (const key of generator) {
-                                if (index >= end) break;
-                                if (index >= start) {
-                                    const decrypted = cipher.decrypt(ciphertext, key);
-                                    let score;
-                                    
-                                    switch(method) {
-                                        case 'quadgrams': score = quadgramScore(decrypted); break;
-                                        case 'ic': score = indexOfCoincidence(decrypted); break;
-                                        case 'chi2': score = -chiSquared(decrypted); break;
-                                        case 'combined': 
-                                            score = quadgramScore(decrypted) * 0.7 + 
-                                                    indexOfCoincidence(decrypted) * 0.3;
-                                            break;
-                                        default: score = quadgramScore(decrypted);
-                                    }
-                                    
-                                    if (score > -10) {
-                                        batchResults.push({key, text: decrypted, score});
-                                    }
-                                    
-                                    processed++;
-                                    
-                                    if (processed % 100 === 0 || performance.now() - lastReport > 500) {
-                                        self.postMessage({
-                                            type: 'progress',
-                                            taskId,
-                                            processed
-                                        });
-                                        lastReport = performance.now();
-                                    }
-                                    
-                                    if (batchResults.length >= 10) {
-                                        self.postMessage({
-                                            type: 'result',
-                                            taskId,
-                                            results: batchResults
-                                        });
-                                        batchResults = [];
-                                    }
-                                }
-                                index++;
-                            }
-                            
-                            if (batchResults.length > 0) {
-                                self.postMessage({
-                                    type: 'result',
-                                    taskId,
-                                    results: batchResults
-                                });
-                            }
-                            
-                            self.postMessage({
-                                type: 'complete',
-                                taskId
-                            });
-                        }
-                    };
-                `;
-                
-                const blob = new Blob([workerCode], {type: 'application/javascript'});
-                return URL.createObjectURL(blob);
-            }
-
-            start(ciphertext, alphabet, maxKeyLength, scoringMethod) {
-                if (!ciphertext || ciphertext.length < 10) {
-                    this.showAlert("Введите шифртекст (минимум 10 символов)", "error");
-                    return;
-                }
-
-                this.isRunning = true;
-                this.startTime = performance.now();
-                this.lastSpeedUpdate = this.startTime;
-                this.lastSpeedKeys = 0;
-                this.showAlert("Запуск атаки...", "info");
-                
-                const keysPerWorker = Math.ceil(this.totalKeys / this.workers.length);
-                const taskId = this.currentTaskId;
-                
-                this.workers.forEach((worker, i) => {
-                    try {
-                        const start = i * keysPerWorker;
-                        const end = start + keysPerWorker;
-                        
-                        worker.postMessage({
-                            type: 'start',
-                            taskId,
-                            alphabet,
-                            ciphertext,
-                            maxKeyLength,
-                            method: scoringMethod,
-                            start,
-                            end
-                        });
-                    } catch (e) {
-                        this.showAlert(`Ошибка запуска потока ${i}: ${e.message}`, "error");
-                        console.error(e);
-                    }
-                });
-                
-                this.updateInterval = setInterval(() => this.updateUI(), 300);
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                document.getElementById('saveBtn').disabled = true;
-            }
-
-            handleWorkerMessage(e) {
-                const {type, taskId, processed, results} = e.data;
-                
-                if (taskId !== this.currentTaskId) return;
-                
-                try {
-                    switch(type) {
-                        case 'progress':
-                            this.keysTested += processed;
-                            break;
-                            
-                        case 'result':
-                            this.addResults(results);
-                            break;
-                            
-                        case 'complete':
-                            this.workerComplete();
-                            break;
-                            
-                        case 'error':
-                            this.showAlert(`Ошибка в потоке: ${e.data.message}`, "error");
-                            break;
-                    }
-                } catch (e) {
-                    console.error("Ошибка обработки сообщения от потока:", e);
-                }
-            }
-
-            addResults(newResults) {
-                if (!newResults || newResults.length === 0) return;
-                
-                this.results.push(...newResults);
-                this.results.sort((a, b) => b.score - a.score);
-                
-                if (this.results.length > this.resultsLimit) {
-                    this.results.length = this.resultsLimit;
-                }
-                
-                if (this.results.length > 0 && this.results[0].score > this.bestScore) {
-                    this.bestScore = this.results[0].score;
-                }
-                
-                this.renderResults();
-            }
-
-            renderResults() {
-                const container = document.getElementById('resultsContainer');
-                if (!container) return;
-                
-                container.innerHTML = '';
-                
-                if (this.results.length === 0) {
-                    container.innerHTML = '<div class="alert alert-info">Нет результатов. Атака в процессе...</div>';
-                    return;
-                }
-                
-                this.results.forEach((result, i) => {
-                    const div = document.createElement('div');
-                    div.className = \`result-item \${i === 0 ? 'best' : ''}\`;
-                    
-                    div.innerHTML = \`
-                        <div class="result-header">
-                            <span class="result-key">\${result.key}</span>
-                            <span class="result-score">\${result.score.toFixed(4)}</span>
-                        </div>
-                        <div class="result-text">\${result.text}</div>
-                    \`;
-                    
-                    container.appendChild(div);
-                });
-            }
-
-            workerComplete() {
-                this.completedWorkers++;
-                
-                if (this.completedWorkers === this.workers.length) {
-                    this.complete();
-                }
-            }
-
-            complete() {
-                clearInterval(this.updateInterval);
-                this.isRunning = false;
-                
-                const elapsed = ((performance.now() - this.startTime) / 1000).toFixed(2);
-                this.showAlert(
-                    \`Атака завершена! Проверено \${this.keysTested.toLocaleString()} ключей за \${elapsed} сек.\`, 
-                    "info"
-                );
-                
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                document.getElementById('saveBtn').disabled = this.results.length === 0;
-            }
-
-            stop() {
-                if (!this.isRunning) return;
-                
-                clearInterval(this.updateInterval);
-                this.isRunning = false;
-                this.currentTaskId++;
-                
-                this.workers.forEach(worker => {
-                    try {
-                        worker.terminate();
-                    } catch (e) {
-                        console.error("Ошибка остановки потока:", e);
-                    }
-                });
-                
-                this.showAlert("Атака остановлена пользователем", "warning");
-                
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                document.getElementById('saveBtn').disabled = this.results.length === 0;
-            }
-
-            updateUI() {
-                if (!this.isRunning) return;
-                
-                const progress = Math.min(100, (this.keysTested / this.totalKeys * 100));
-                document.getElementById('progressBar').style.width = \`\${progress}%\`;
-                document.getElementById('progressValue').textContent = \`\${progress.toFixed(2)}%\`;
-                
-                const now = performance.now();
-                const elapsed = (now - this.startTime) / 1000;
-                const speed = Math.floor(this.keysTested / Math.max(1, elapsed));
-                document.getElementById('speed').textContent = speed.toLocaleString();
-                
-                if (speed > 0) {
-                    const remaining = (this.totalKeys - this.keysTested) / speed;
-                    document.getElementById('timeLeft').textContent = this.formatTime(remaining);
-                }
-                
-                document.getElementById('keysTested').textContent = this.keysTested.toLocaleString();
-                document.getElementById('bestScore').textContent = 
-                    this.bestScore !== -Infinity ? this.bestScore.toFixed(4) : '-';
-            }
-
-            calculateTotalKeys(alphabetSize, maxLength) {
-                return alphabetSize * (Math.pow(alphabetSize, maxLength) - 1) / (alphabetSize - 1);
-            }
-
-            formatTime(seconds) {
-                if (seconds < 60) return \`\${Math.ceil(seconds)} сек\`;
-                if (seconds < 3600) return \`\${Math.floor(seconds / 60)} мин \${Math.ceil(seconds % 60)} сек\`;
-                
-                const hours = Math.floor(seconds / 3600);
-                const minutes = Math.floor((seconds % 3600) / 60);
-                return \`\${hours} ч \${minutes} мин\`;
-            }
-
-            showAlert(message, type) {
-                const alertEl = document.getElementById('alert');
-                alertEl.textContent = message;
-                alertEl.className = \`alert alert-\${type} active\`;
-                
-                setTimeout(() => {
-                    alertEl.classList.remove('active');
-                }, 5000);
-            }
-
-            saveResults() {
-                if (this.results.length === 0) {
-                    this.showAlert("Нет результатов для сохранения", "warning");
-                    return;
-                }
-                
-                let content = \`Результаты взлома шифра Виженера\\n\`;
-                content += \`Дата: \${new Date().toLocaleString()}\\n\`;
-                content += \`Проверено ключей: \${this.keysTested}\\n\`;
-                content += \`Алфавит: \${document.getElementById('alphabet').value}\\n\`;
-                content += \`Метод оценки: \${document.getElementById('scoringMethod').value}\\n\`;
-                content += \`Макс. длина ключа: \${document.getElementById('keyLength').value}\\n\\n\`;
-                
-                this.results.forEach((result, i) => {
-                    content += \`=== Результат \${i + 1} ===\\n\`;
-                    content += \`Ключ: \${result.key}\\n\`;
-                    content += \`Оценка: \${result.score.toFixed(4)}\\n\`;
-                    content += \`Текст: \${result.text}\\n\\n\`;
-                });
-                
-                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = \`vigenere_results_\${new Date().toISOString().slice(0, 10)}.txt\`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                this.showAlert("Результаты сохранены в файл", "info");
-            }
+            brains.set(id, brain);
         }
 
-        // ========================
-        // Инициализация приложения
-        // ========================
-        document.addEventListener('DOMContentLoaded', () => {
-            const breaker = new VigenereBreakerPro();
-            
-            // Обработчики элементов управления
-            document.getElementById('workers').addEventListener('input', function() {
-                document.getElementById('workersValue').textContent = this.value;
-            });
-            
-            document.getElementById('keyLength').addEventListener('input', function() {
-                document.getElementById('keyLengthValue').textContent = this.value;
-            });
-            
-            document.getElementById('resultsLimit').addEventListener('input', function() {
-                document.getElementById('resultsLimitValue').textContent = this.value;
-            });
-            
-            // Запуск атаки
-            document.getElementById('startBtn').addEventListener('click', () => {
-                const alphabet = document.getElementById('alphabet').value;
-                const workers = parseInt(document.getElementById('workers').value);
-                const maxKeyLength = parseInt(document.getElementById('keyLength').value);
-                const scoringMethod = document.getElementById('scoringMethod').value;
-                const ciphertext = document.getElementById('ciphertext').value;
-                const resultsLimit = parseInt(document.getElementById('resultsLimit').value);
-                
-                if (breaker.init(alphabet, workers, maxKeyLength, resultsLimit)) {
-                    breaker.start(ciphertext, alphabet, maxKeyLength, scoringMethod);
-                }
-            });
-            
-            // Остановка атаки
-            document.getElementById('stopBtn').addEventListener('click', () => {
-                breaker.stop();
-            });
-            
-            // Сохранение результатов
-            document.getElementById('saveBtn').addEventListener('click', () => {
-                breaker.saveResults();
-            });
-        });
-    </script>
-</body>
-</html>
+        // === GAME LOOP ===
+        let running = false;
+        let lastTime = 0;
+        let frameCount = 0;
