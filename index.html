@@ -133,3 +133,168 @@
         let running = false;
         let lastTime = 0;
         let frameCount = 0;
+        let fps = 0;
+
+        function gameLoop(timestamp) {
+            if (!running) return;
+
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+
+            // Update
+            engine.step(dt);
+
+            // AI decisions
+            for (const [id, agent] of engine.agents) {                if (!agent.alive) continue;
+
+                const brain = brains.get(id);
+                
+                // Get sensors
+                const sensors = getSensors(agent, engine);
+                
+                // Forward through brain
+                const result = brain.forward(sensors, 0, null, {
+                    others: getSocialContext(agent, engine)
+                });
+
+                // Apply actions
+                agent.setThrottle(result.output[4]);  // throttle
+                agent.setSteering(result.output[8]);  // steering
+                
+                if (result.output[6] > 0.7) {  // aggression
+                    agent.requestAttack();
+                }
+            }
+
+            // Render
+            engine.render(ctx, {
+                showGrid: true,
+                showTrail: true,
+                debug: false
+            });
+
+            // Update UI
+            frameCount++;
+            if (frameCount % 30 === 0) {
+                fps = Math.round(1 / dt);
+                document.getElementById('stepStat').textContent = engine.stepCount;
+                document.getElementById('agentStat').textContent = engine.agents.size;
+                document.getElementById('fpsStat').textContent = fps;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // === HELPERS ===
+
+        function getSensors(agent, engine) {
+            const sensors = new Array(64).fill(0);
+            
+            // Find nearest enemy
+            let nearestEnemy = null;
+            let nearestDist = Infinity;
+            
+            for (const [id, other] of engine.agents) {                if (other === agent || !other.alive) continue;
+                const dist = Utils.dist(agent, other);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearestEnemy = other;
+                }
+            }
+
+            if (nearestEnemy) {
+                // Enemy position (normalized)
+                sensors[0] = (nearestEnemy.x - agent.x) / 400;
+                sensors[1] = (nearestEnemy.y - agent.y) / 300;
+                sensors[2] = nearestDist / 200;
+                sensors[3] = nearestEnemy.health / nearestEnemy.stats.maxHealth;
+                
+                // Angle to enemy
+                sensors[20] = Utils.angleToTarget(
+                    agent.x, agent.y,
+                    nearestEnemy.x, nearestEnemy.y,
+                    agent.facingAngle
+                );
+            }
+
+            // Nearest wall
+            let nearestWall = null;
+            let nearestWallDist = Infinity;
+            for (const wall of engine.world.walls) {
+                const dist = Utils.dist(agent, wall);
+                if (dist < nearestWallDist) {
+                    nearestWallDist = dist;
+                    nearestWall = wall;
+                }
+            }
+
+            if (nearestWall) {
+                sensors[4] = (nearestWall.x - agent.x) / 400;
+                sensors[5] = (nearestWall.y - agent.y) / 300;
+                sensors[6] = nearestWallDist / 100;
+            }
+
+            // Self
+            sensors[7] = agent.x / 820;
+            sensors[8] = agent.y / 600;
+            sensors[9] = agent.health / agent.stats.maxHealth;
+            sensors[10] = agent.vx / 25;
+            sensors[11] = agent.vy / 25;
+
+            return sensors;
+        }
+        function getSocialContext(agent, engine) {
+            const others = [];
+            for (const [id, other] of engine.agents) {
+                if (other === agent || !other.alive) continue;
+                others.push({
+                    id: other.id,
+                    distance: Utils.dist(agent, other),
+                    healthRatio: other.health / other.stats.maxHealth,
+                    aggression: 0.5
+                });
+            }
+            return { others, enemyId: others[0]?.id };
+        }
+
+        // === CONTROLS ===
+
+        document.getElementById('btnStart').onclick = () => {
+            running = !running;
+            if (running) {
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+                document.getElementById('btnStart').textContent = '⏸ Pause';
+            } else {
+                document.getElementById('btnStart').textContent = '▶ Start';
+            }
+        };
+
+        document.getElementById('btnReset').onclick = () => {
+            engine.reset();
+            for (const brain of brains.values()) {
+                brain.resetEpisode();
+            }
+        };
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            engine.config.width = canvas.width;
+            engine.config.height = canvas.height;
+        });
+
+        // Global Utils for helpers
+        window.Utils = {
+            clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
+            dist: (a, b) => Math.hypot((a?.x ?? 0) - (b?.x ?? 0), (a?.y ?? 0) - (b?.y ?? 0)),
+            angleToTarget: (fromX, fromY, toX, toY, facing) => {
+                const angle = Math.atan2(toY - fromY, toX - fromX) - facing;
+                while (angle > Math.PI) return angle - Math.PI * 2;
+                while (angle < -Math.PI) return angle + Math.PI * 2;                return angle;
+            }
+        };
+    </script>
+</body>
+</html>
