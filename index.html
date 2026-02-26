@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Arena v2.1 — Production</title>
+    <title>AI Arena v2.1</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,42 +14,64 @@
         }
         #gameCanvas {
             display: block;
-            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
         }
         #ui {
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(18, 18, 37, 0.9);
-            padding: 10px;
+            background: rgba(18, 18, 37, 0.95);
+            padding: 15px;
             border-radius: 8px;
-            font-size: 12px;
+            font-size: 13px;
             border: 1px solid #2a2a45;
+            min-width: 200px;
         }
         #ui h3 {
             color: #00f2ff;
-            margin-bottom: 8px;
-            font-size: 14px;
+            margin-bottom: 10px;
+            font-size: 15px;
         }
         .stat {
-            margin: 4px 0;
+            margin: 5px 0;
             display: flex;
             justify-content: space-between;
-            gap: 20px;
         }
         .stat-label { color: #b0b0d0; }
         .stat-value { color: #00ff9d; font-weight: bold; }
+        .status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .status.ok { background: rgba(0, 255, 157, 0.2); color: #00ff9d; }
+        .status.error { background: rgba(255, 85, 119, 0.2); color: #ff5577; }
+        .status.loading { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
         button {
             margin-top: 10px;
-            padding: 8px 16px;
+            padding: 10px 20px;
             background: #00f2ff;
             color: #000;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 13px;
         }
         button:hover { background: #00c4d4; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        #errorBox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            max-width: 400px;
+            background: rgba(255, 85, 119, 0.9);
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -69,26 +91,52 @@
             <span class="stat-label">FPS:</span>
             <span class="stat-value" id="fpsStat">0</span>
         </div>
-        <button id="btnStart">▶ Start</button>
-        <button id="btnReset">🔄 Reset</button>
+        <div class="stat">
+            <span class="stat-label">Brains:</span>
+            <span class="stat-value" id="brainStat">0</span>
+        </div>
+        <div id="statusBox" class="status loading">⏳ Loading...</div>
+        <button id="btnStart" disabled>▶ Start</button>
+        <button id="btnReset" disabled>🔄 Reset</button>
     </div>
 
+    <div id="errorBox"></div>
+
     <script type="module">
-        window.addEventListener('error', (e) => {
-            alert('ERROR: ' + e.message + '\nFile: ' + (e.filename || 'unknown') + '\nLine: ' + (e.lineno || '?'));
-        });
+        // === ГЛОБАЛЬНЫЙ ПЕРЕХОВАТ ОШИБОК ===
+        const errorBox = document.getElementById('errorBox');
+        const statusBox = document.getElementById('statusBox');
         
-        window.addEventListener('unhandledrejection', (e) => {
-            alert('PROMISE ERROR: ' + e.reason);
-        });
+        function showError(msg) {
+            errorBox.style.display = 'block';
+            errorBox.innerHTML = '<strong>❌ ERROR:</strong><br><br>' + msg.replace(/\n/g, '<br>');
+            statusBox.className = 'status error';
+            statusBox.textContent = '❌ Error';
+        }
+
+        function setStatus(msg, type) {
+            statusBox.textContent = msg;
+            statusBox.className = 'status ' + type;
+        }
 
         try {
-            import { GameEngine } from './game.js';
-            import { Cortex2Brain } from './core/cortex.js';
+            // === 1. ПОДКЛЮЧЕНИЕ К CORTEX.JS ===
+            setStatus('📦 Loading Cortex2Brain...', 'loading');
+            const cortexModule = await import('./core/cortex.js');
+            const { Cortex2Brain } = cortexModule;
+            setStatus('✅ Cortex2Brain loaded!', 'ok');
+            document.getElementById('brainStat').textContent = '1';
 
+            // === 2. ПОДКЛЮЧЕНИЕ К GAME.JS ===
+            setStatus('📦 Loading GameEngine...', 'loading');
+            const gameModule = await import('./game.js');
+            const { GameEngine } = gameModule;
+            setStatus('✅ GameEngine loaded!', 'ok');
+
+            // === 3. ИНИЦИАЛИЗАЦИЯ ===
+            setStatus('🎮 Initializing engine...', 'loading');
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
 
@@ -97,7 +145,10 @@
                 height: canvas.height,
                 seed: 'arena_1'
             }).init();
+            setStatus('✅ Engine ready!', 'ok');
 
+            // === 4. СОЗДАНИЕ АГЕНТОВ ===
+            setStatus('🤖 Creating agents...', 'loading');
             engine.addAgent({
                 id: 'blue',
                 x: 200,
@@ -113,7 +164,11 @@
                 color: '#ff5577',
                 stats: { maxHealth: 100, damage: 3, speed: 22 }
             });
+            document.getElementById('agentStat').textContent = engine.agents.size;
+            setStatus('✅ Agents created!', 'ok');
 
+            // === 5. СОЗДАНИЕ МОЗГОВ (CORTEX) ===
+            setStatus('🧠 Creating Cortex brains...', 'loading');
             const brains = new Map();
             for (const [id, agent] of engine.agents) {
                 const brain = new Cortex2Brain({
@@ -135,7 +190,10 @@
 
                 brains.set(id, brain);
             }
+            document.getElementById('brainStat').textContent = brains.size;
+            setStatus('✅ Brains connected to Cortex!', 'ok');
 
+            // === 6. GAME LOOP ===
             let running = false;
             let lastTime = 0;
             let frameCount = 0;
@@ -147,62 +205,92 @@
                 const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
                 lastTime = timestamp;
 
-                try {
-                    engine.step(dt);
+                engine.step(dt);
 
-                    for (const [id, agent] of engine.agents) {
-                        if (!agent.alive) continue;
-
-                        const brain = brains.get(id);
-                        if (!brain) continue;
-                        
-                        const sensors = getSensors(agent, engine);
-                        
-                        const result = brain.forward(sensors, 0, null, {
-                            others: getSocialContext(agent, engine)
-                        });
-
-                        agent.setThrottle(result.output[4]);
-                        agent.setSteering(result.output[8]);
-                        
-                        if (result.output[6] > 0.7) {
-                            agent.requestAttack();
-                        }
-                    }
-
-                    engine.render(ctx, {
-                        showGrid: true,
-                        showTrail: true,
-                        debug: false
+                // AI DECISIONS THROUGH CORTEX
+                for (const [id, agent] of engine.agents) {
+                    if (!agent.alive) continue;
+                    const brain = brains.get(id);
+                    if (!brain) continue;
+                    
+                    const sensors = getSensors(agent, engine);
+                    const result = brain.forward(sensors, 0, null, {
+                        others: getSocialContext(agent, engine)
                     });
 
-                    frameCount++;
-                    if (frameCount % 30 === 0) {
-                        fps = Math.round(1 / dt);
-                        document.getElementById('stepStat').textContent = engine.stepCount;
-                        document.getElementById('agentStat').textContent = engine.agents.size;
-                        document.getElementById('fpsStat').textContent = fps;
+                    agent.setThrottle(result.output[4]);
+                    agent.setSteering(result.output[8]);
+                    if (result.output[6] > 0.7) {
+                        agent.requestAttack();
                     }
-                } catch (loopError) {
-                    alert('Game loop error: ' + loopError.message);
+                }
+
+                engine.render(ctx, { showGrid: true, showTrail: true });
+
+                frameCount++;
+                if (frameCount % 30 === 0) {
+                    fps = Math.round(1 / dt);
+                    document.getElementById('stepStat').textContent = engine.stepCount;
+                    document.getElementById('fpsStat').textContent = fps;
                 }
 
                 requestAnimationFrame(gameLoop);
             }
 
+            // === 7. CONTROLS ===
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnReset').disabled = false;
+            setStatus('✅ READY! Press Start', 'ok');
+
+            document.getElementById('btnStart').onclick = () => {
+                running = !running;
+                if (running) {
+                    lastTime = performance.now();
+                    requestAnimationFrame(gameLoop);
+                    document.getElementById('btnStart').textContent = '⏸ Pause';
+                    setStatus('▶ Running', 'ok');
+                } else {
+                    document.getElementById('btnStart').textContent = '▶ Start';
+                    setStatus('⏸ Paused', 'loading');
+                }
+            };
+
+            document.getElementById('btnReset').onclick = () => {
+                engine.reset();
+                for (const brain of brains.values()) {
+                    brain.resetEpisode();
+                }
+                setStatus('🔄 Reset', 'ok');
+            };
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                engine.config.width = canvas.width;
+                engine.config.height = canvas.height;
+            });
+
+            // Utils
+            window.Utils = {
+                clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
+                dist: (a, b) => Math.hypot((a?.x ?? 0) - (b?.x ?? 0), (a?.y ?? 0) - (b?.y ?? 0)),
+                angleToTarget: (fromX, fromY, toX, toY, facing) => {
+                    let angle = Math.atan2(toY - fromY, toX - fromX) - facing;
+                    while (angle > Math.PI) angle -= Math.PI * 2;
+                    while (angle < -Math.PI) angle += Math.PI * 2;
+                    return angle;
+                }
+            };
+
+            // Helpers
             function getSensors(agent, engine) {
                 const sensors = new Array(64).fill(0);
-                
-                let nearestEnemy = null;
-                let nearestDist = Infinity;
+                let nearestEnemy = null, nearestDist = Infinity;
                 
                 for (const [id, other] of engine.agents) {
                     if (other === agent || !other.alive) continue;
                     const dist = Utils.dist(agent, other);
-                    if (dist < nearestDist) {
-                        nearestDist = dist;
-                        nearestEnemy = other;
-                    }
+                    if (dist < nearestDist) { nearestDist = dist; nearestEnemy = other; }
                 }
 
                 if (nearestEnemy) {
@@ -210,22 +298,12 @@
                     sensors[1] = (nearestEnemy.y - agent.y) / 300;
                     sensors[2] = nearestDist / 200;
                     sensors[3] = nearestEnemy.health / nearestEnemy.stats.maxHealth;
-                    
-                    sensors[20] = Utils.angleToTarget(
-                        agent.x, agent.y,
-                        nearestEnemy.x, nearestEnemy.y,
-                        agent.facingAngle
-                    );
                 }
 
-                let nearestWall = null;
-                let nearestWallDist = Infinity;
+                let nearestWall = null, nearestWallDist = Infinity;
                 for (const wall of engine.world.walls) {
                     const dist = Utils.dist(agent, wall);
-                    if (dist < nearestWallDist) {
-                        nearestWallDist = dist;
-                        nearestWall = wall;
-                    }
+                    if (dist < nearestWallDist) { nearestWallDist = dist; nearestWall = wall; }
                 }
 
                 if (nearestWall) {
@@ -257,52 +335,8 @@
                 return { others, enemyId: others[0]?.id };
             }
 
-            document.getElementById('btnStart').onclick = () => {
-                try {
-                    running = !running;
-                    if (running) {
-                        lastTime = performance.now();
-                        requestAnimationFrame(gameLoop);
-                        document.getElementById('btnStart').textContent = '⏸ Pause';
-                    } else {
-                        document.getElementById('btnStart').textContent = '▶ Start';
-                    }
-                } catch (e) {
-                    alert('Start error: ' + e.message);
-                }
-            };
-
-            document.getElementById('btnReset').onclick = () => {
-                try {
-                    engine.reset();
-                    for (const brain of brains.values()) {
-                        brain.resetEpisode();
-                    }
-                } catch (e) {
-                    alert('Reset error: ' + e.message);
-                }
-            };
-
-            window.addEventListener('resize', () => {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                engine.config.width = canvas.width;
-                engine.config.height = canvas.height;
-            });
-
-            window.Utils = {
-                clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
-                dist: (a, b) => Math.hypot((a?.x ?? 0) - (b?.x ?? 0), (a?.y ?? 0) - (b?.y ?? 0)),
-                angleToTarget: (fromX, fromY, toX, toY, facing) => {
-                    const angle = Math.atan2(toY - fromY, toX - fromX) - facing;
-                    while (angle > Math.PI) return angle - Math.PI * 2;
-                    while (angle < -Math.PI) return angle + Math.PI * 2;
-                    return angle;
-                }
-            };
-            
         } catch (error) {
-            alert('❌ INIT ERROR:\n\n' + error.message + '\n\nStack:\n' + error.stack);
+            showError(error.message + '\n\n' + error.stack);
         }
     </script>
 </body>
