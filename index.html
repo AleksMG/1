@@ -4364,8 +4364,8 @@ class GameEngine {
         if (!this.canvas) { console.error('Canvas element not found'); return; }
         this.ctx = this.canvas.getContext('2d');
         if (!this.ctx) { console.error('Failed to get canvas context'); return; }
-        this.logicalWidth = arenaConfig.ARCH.LOGICAL_WIDTH;  // 850
-        this.logicalHeight = arenaConfig.ARCH.LOGICAL_HEIGHT;  // 580
+        this.logicalWidth = arenaConfig.ARCH.LOGICAL_WIDTH;
+        this.logicalHeight = arenaConfig.ARCH.LOGICAL_HEIGHT;
         this.resize();
         this.world = new World(this.logicalWidth, this.logicalHeight);
         this.running = false; this.lastTime = 0; this.fps = 60;
@@ -4382,15 +4382,15 @@ class GameEngine {
     resize() {
         const parent = this.canvas?.parentElement;
         if (!parent) return;
-        this.canvas.width = parent.clientWidth;        this.canvas.height = parent.clientHeight;
+        this.canvas.width = parent.clientWidth;
+        this.canvas.height = parent.clientHeight;
     }
 
     _onResize() { this.resize(); }
 
     setupEvents() {
         window.addEventListener('resize', this._onResize);
-        const handlePointer = (e) => {
-            const rect = this.canvas.getBoundingClientRect();
+        const handlePointer = (e) => {            const rect = this.canvas.getBoundingClientRect();
             const scaleX = this.canvas.width / rect.width;
             const scaleY = this.canvas.height / rect.height;
             const clientX = e.touches?.[0]?.clientX ?? e.clientX;
@@ -4431,15 +4431,15 @@ class GameEngine {
                 const value = parseFloat(e.target.value);
                 if (!isFinite(value)) return;
                 arenaConfig[configKey] = value;
-                display.textContent = value.toFixed(3);                if (typeof callback === 'function') {
+                display.textContent = value.toFixed(3);
+                if (typeof callback === 'function') {
                     try { callback.call(this, value); } catch (err) { console.error(err); }
                 }
             };
         };
         
         bindSlider('learningRate', 'learningRate', 'learningRateValue', (v) => {
-            if (this.world?.enemies) this.world.enemies.forEach(a => { if (a?.net) a.net.lr = v; });
-        });
+            if (this.world?.enemies) this.world.enemies.forEach(a => { if (a?.net) a.net.lr = v; });        });
         bindSlider('lambda', 'lambda', 'lambdaValue', (v) => {
             if (this.world?.enemies) this.world.enemies.forEach(a => { if (a?.net) a.net.lambda = v; });
         });
@@ -4480,15 +4480,15 @@ class GameEngine {
             case '1': this.selectedAgent = this.world?.enemies?.[0]; this.updateDebugPanel(); break;
             case '2': this.selectedAgent = this.world?.enemies?.[1]; this.updateDebugPanel(); break;
             case 'Tab': e.preventDefault(); const focusable = document.querySelectorAll('button, input, [tabindex="0"]'), idx = Array.from(focusable).indexOf(document.activeElement); focusable[(idx + 1) % focusable.length]?.focus(); break;
-            case 'Escape': if (this.debug) { this.debug = false; this.updateDebugPanel(); } break;            case 'm': if (this.debug) this.regenerateMaze(); break;
+            case 'Escape': if (this.debug) { this.debug = false; this.updateDebugPanel(); } break;
+            case 'm': if (this.debug) this.regenerateMaze(); break;
             case 'h': arenaConfig.enableHealthPacks = !arenaConfig.enableHealthPacks; Logger.log(`🧪 Health packs: ${arenaConfig.enableHealthPacks ? 'ON' : 'OFF'}`, 'info'); break;
             case 'v': this.vision = !this.vision; this.updateBtns(); break;
         }
     }
 
     _onClick({ x, y }) {
-        if (!this.debug) return;
-        const lx = x / (this.canvas.width / this.logicalWidth), ly = y / (this.canvas.height / this.logicalHeight);
+        if (!this.debug) return;        const lx = x / (this.canvas.width / this.logicalWidth), ly = y / (this.canvas.height / this.logicalHeight);
         let nearest = null, minD = 25;
         for (const a of this.world?.enemies || []) {
             if (!a) continue;
@@ -4529,16 +4529,15 @@ class GameEngine {
         const count = parseInt(document.getElementById('agentCount').value);
         const blueWeapon = document.getElementById('blueWeaponSelect').value;
         const redWeapon = document.getElementById('redWeaponSelect').value;
-        this.world.spawnAgents(count, blueWeapon, redWeapon);        this.updateAgentList();
+        this.world.spawnAgents(count, blueWeapon, redWeapon);
+        this.updateAgentList();
         this.updateStats();
         Logger.log('🔄 Reset', 'warn');
     }
 
     regenerateMaze() {
         if (this.world) {
-            const seed = arenaConfig.seed + '_MANUAL_' + Date.now();
-            this.world.reset(seed);
-            // Re-spawn agents at validated positions
+            const seed = arenaConfig.seed + '_MANUAL_' + Date.now();            this.world.reset(seed);
             const count = parseInt(document.getElementById('agentCount').value);
             const blueWeapon = document.getElementById('blueWeaponSelect').value;
             const redWeapon = document.getElementById('redWeaponSelect').value;
@@ -4578,7 +4577,8 @@ class GameEngine {
                     <span style="margin-left:auto; font-size:0.5rem; opacity:0.7">${agent.team.toUpperCase()}</span>
                 </header>
                 <div class="health-bar"><div class="health-fill" style="width:${(agent.health/agent.stats.maxHealth)*100}%"></div></div>
-                <div class="agent-stats"><span>HP: <b>${Math.round(agent.health)}</b></span><span>Wins: <b>${agent.wins}</b></span></div>                <div class="weapon-badge">${agent.weapon.icon} ${agent.weapon.name}</div>
+                <div class="agent-stats"><span>HP: <b>${Math.round(agent.health)}</b></span><span>Wins: <b>${agent.wins}</b></span></div>
+                <div class="weapon-badge">${agent.weapon.icon} ${agent.weapon.name}</div>
             </article>
         `).join('');
     }
@@ -4586,8 +4586,7 @@ class GameEngine {
     updateStats(state = null) {
         if (!state) state = { episode: this.world.episode, totalFights: this.world.totalFights };
         document.getElementById('episodeStat').textContent = state.episode;
-        document.getElementById('stepStat').textContent = this.world.step;
-        document.getElementById('totalFightsStat').textContent = state.totalFights;
+        document.getElementById('stepStat').textContent = this.world.step;        document.getElementById('totalFightsStat').textContent = state.totalFights;
         document.getElementById('obstaclesStat').textContent = this.world.walls.length;
         document.getElementById('episodeProgress').style.width = `${(state.episode % 10) * 10}%`;
     }
@@ -4627,7 +4626,8 @@ class GameEngine {
 
     toggleDebug() {
         this.debug = !this.debug;
-        document.getElementById('btnDebug').classList.toggle('active', this.debug);        this.updateDebugPanel();
+        document.getElementById('btnDebug').classList.toggle('active', this.debug);
+        this.updateDebugPanel();
     }
 
     updateBtns() {
@@ -4635,8 +4635,7 @@ class GameEngine {
     }
 
     save() {
-        const data = { 
-            version: '6.0.8-PROFESSIONAL', 
+        const data = {             version: '6.0.8-PROFESSIONAL', 
             timestamp: Date.now(), 
             config: { 
                 agentCount: document.getElementById('agentCount').value, 
@@ -4676,7 +4675,8 @@ class GameEngine {
         this.world.episode = data.world?.episode || 0;
         this.world.step = data.world?.step || 0;
         this.world.totalFights = data.world?.totalFights || 0;
-        this.world.walls = data.world?.walls || [];        this.world._mazeConfig = data.world?.mazeConfig || null;
+        this.world.walls = data.world?.walls || [];
+        this.world._mazeConfig = data.world?.mazeConfig || null;
         this.world._validatedSpawns = data.world?.validatedSpawns || null;
         this.world.enemies = data.agents?.map((a, i) => Agent.fromJSON(a, i < data.agents.length/2 ? '#00d4ff' : '#ff5577')) || [];
         if (data.healthPacks) {
@@ -4684,8 +4684,7 @@ class GameEngine {
         }
         this.updateAgentList();
         this.updateStats();
-        Logger.log('📂 Loaded', 'success');
-    }
+        Logger.log('📂 Loaded', 'success');    }
 
     exportWeights() {
         const data = { 
@@ -4726,6 +4725,7 @@ class GameEngine {
         };
         reader.readAsText(file);
     }
+
     applyWeapons() {
         const blueWeapon = document.getElementById('blueWeaponSelect').value;
         const redWeapon = document.getElementById('redWeaponSelect').value;
@@ -4734,7 +4734,6 @@ class GameEngine {
         this.updateAgentList();
         Logger.log('✅ Weapons applied', 'success');
     }
-
     randomWeapons() {
         const types = Object.keys(WEAPONS);
         const blue = types[Utils.randInt(0, types.length - 1)];
