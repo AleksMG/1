@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self'; font-src 'self';">
-    <meta name="description" content="AI Arena v6.0.8 Professional — Maze + Health Packs + Tactical Combat">
+    <meta name="description" content="AI Arena v6.0.9 Professional — Random Walls + Health Packs + Tactical Combat">
     <meta name="theme-color" content="#0a0a15">
     <meta name="robots" content="noindex">
-    <title>🎮 AI Arena v6.0.8 Professional</title>
+    <title>🎮 AI Arena v6.0.9 Professional</title>
     <style>
         :root {
             --bg: #0a0a15; --bg-gradient-start: #0a0a15; --bg-gradient-end: #1a1a2e;
@@ -189,7 +189,7 @@
     <a href="#gameCanvas" class="skip-link">Перейти к симуляции</a>
     <div class="container">
         <header class="header">
-            <h1>🎮 AI ARENA <span class="version-badge">v6.0.8 PRO</span></h1>
+            <h1>🎮 AI ARENA <span class="version-badge">v6.0.9 PRO</span></h1>
             <div class="fps-counter" id="fpsCounter">FPS: 0</div>
         </header>
         <canvas id="gameCanvas"></canvas>
@@ -235,19 +235,15 @@
                 </div>
                 <div class="separator"></div>
                 <div class="control-group">
-                    <label class="control-label"><span>🌀 Тип лабиринта</span></label>
-                    <select id="mazeTypeSelect">
-                        <option value="random">🎲 Случайный</option>
-                        <option value="labyrinth">🔀 Лабиринт</option>
-                        <option value="clusters">🪨 Кластеры</option>
-                    </select>
+                    <label class="control-label"><span>🧱 Кол-во стен</span><span id="wallCountValue">3</span></label>
+                    <input type="range" id="wallCount" min="2" max="5" step="1" value="3">
                 </div>
                 <div class="control-group">
-                    <label class="control-label"><span>Сложность</span><span id="mazeComplexityValue">0.72</span></label>                    <input type="range" id="mazeComplexity" min="0.4" max="0.95" step="0.05" value="0.72">
+                    <label class="control-label"><span>Длина стен</span><span id="wallLengthValue">120</span></label>
+                    <input type="range" id="wallLength" min="60" max="200" step="10" value="120">
                 </div>
                 <div class="btn-group">
-                    <button class="btn-secondary" id="btnRegenerateMaze">🔄 Пересоздать</button>
-                    <button class="btn-toggle" id="btnShowGrid">⊞ Сетка</button>
+                    <button class="btn-secondary" id="btnRegenerateWalls">🔄 Пересоздать</button>                    <button class="btn-toggle" id="btnShowGrid">⊞ Сетка</button>
                 </div>
             </section>
             <section class="panel">
@@ -260,7 +256,7 @@
                     <div class="stat"><span class="stat-label">Эпизод</span><span class="stat-value" id="episodeStat">0</span></div>
                     <div class="stat"><span class="stat-label">Шаг</span><span class="stat-value" id="stepStat">0</span></div>
                     <div class="stat"><span class="stat-label">Бои</span><span class="stat-value" id="totalFightsStat">0</span></div>
-                    <div class="stat"><span class="stat-label">Стены</span><span class="stat-value" id="obstaclesStat">12</span></div>
+                    <div class="stat"><span class="stat-label">Стены</span><span class="stat-value" id="obstaclesStat">3</span></div>
                 </div>
                 <div class="progress-bar"><div class="progress-fill" id="episodeProgress" style="width: 0%"></div></div>
             </section>
@@ -292,11 +288,11 @@
                 <label class="toggle"><input type="checkbox" id="enableHebbian" checked> Hebbian</label>
                 <label class="toggle"><input type="checkbox" id="enableConsolidation" checked> Consolidation</label>
                 <label class="toggle"><input type="checkbox" id="enableHealthPacks" checked> Аптечки</label>
-                <label class="toggle"><input type="checkbox" id="enableLowHealthHint" checked> Подсказки HP</label>                <label class="toggle"><input type="checkbox" id="enableMazeGeneration" checked> Лабиринт</label>
+                <label class="toggle"><input type="checkbox" id="enableLowHealthHint" checked> Подсказки HP</label>
+                <label class="toggle"><input type="checkbox" id="enableWalls" checked> Стены</label>
             </section>
             <section class="panel">
-                <h2 class="panel-title">📈 METRICS</h2>
-                <div class="learning-metrics">
+                <h2 class="panel-title">📈 METRICS</h2>                <div class="learning-metrics">
                     <div class="metric-item"><span class="metric-label">TD-Error</span><span class="metric-value" id="metricTDError">0.0000</span></div>
                     <div class="metric-item"><span class="metric-label">Win Rate</span><span class="metric-value" id="metricWinRate">0.00</span></div>
                     <div class="metric-item"><span class="metric-label">Damage</span><span class="metric-value" id="metricDamage">0.00</span></div>
@@ -342,11 +338,10 @@
 <script>
 'use strict';
 // ============================================================================
-// PATCH E.1: WALL CLASS - Line segments for proper maze walls
+// PATCH E.1: WALL CLASS - Line segments for proper collision
 // ============================================================================
 class Wall {
-    constructor(x1, y1, x2, y2, type = 'internal') {
-        this.x1 = x1; this.y1 = y1;
+    constructor(x1, y1, x2, y2, type = 'internal') {        this.x1 = x1; this.y1 = y1;
         this.x2 = x2; this.y2 = y2;
         this.type = type;
         this.thickness = 12;
@@ -390,113 +385,62 @@ class Wall {
         ctx.lineTo(this.x2, this.y2);
         ctx.stroke();
     }
-        toJSON() {
+    
+    toJSON() {
         return { x1: this.x1, y1: this.y1, x2: this.x2, y2: this.y2, type: this.type, thickness: this.thickness };
     }
     
-    static fromJSON(data) {
-        return new Wall(data.x1, data.y1, data.x2, data.y2, data.type);
+    static fromJSON(data) {        return new Wall(data.x1, data.y1, data.x2, data.y2, data.type);
     }
 }
 
 // ============================================================================
-// PATCH E.2: MAZE GENERATOR - Recursive Backtracker Algorithm
+// PATCH E.2: RANDOM WALL GENERATOR - 2-3 walls in random positions
 // ============================================================================
-const MazeGenerator = Object.freeze({
-    generateMaze: function(width, height, cellSize = 60, complexity = 0.7, seed = null) {
-        const rng = seed ? new SeededRNG(seed + '_MAZE') : { next: () => Math.random() };
+const WallGenerator = Object.freeze({
+    generateRandomWalls: function(width, height, count = 3, baseLength = 120, seed = null) {
+        const rng = seed ? new SeededRNG(seed + '_WALLS') : { next: () => Math.random() };
         const walls = [];
+        const margin = 80;
+        const minLength = baseLength * 0.7;
+        const maxLength = baseLength * 1.3;
         
-        const cols = Math.floor((width - 100) / cellSize);
-        const rows = Math.floor((height - 100) / cellSize);
-        const grid = Array(rows).fill(null).map(() => Array(cols).fill(1));
-        
-        const stack = [];
-        grid[1][1] = 0;
-        stack.push({ x: 1, y: 1 });
-        
-        const directions = [
-            { dx: 0, dy: -2 }, { dx: 0, dy: 2 },
-            { dx: -2, dy: 0 }, { dx: 2, dy: 0 }
-        ];
-        
-        while (stack.length > 0) {
-            const current = stack[stack.length - 1];
-            const neighbors = [];
+        for (let i = 0; i < count; i++) {
+            let attempts = 0;
+            let valid = false;
+            let wall;
             
-            for (const dir of directions) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
+            while (!valid && attempts < 50) {
+                const cx = margin + rng.next() * (width - margin * 2);
+                const cy = margin + rng.next() * (height - margin * 2);
+                const length = minLength + rng.next() * (maxLength - minLength);
+                const angle = rng.next() * Math.PI;
                 
-                if (nx > 0 && nx < cols - 1 && ny > 0 && ny < rows - 1 && grid[ny][nx] === 1) {
-                    neighbors.push({ x: nx, y: ny, dx: dir.dx, dy: dir.dy });
-                }
-            }
-            
-            if (neighbors.length > 0) {
-                const next = neighbors[Math.floor(rng.next() * neighbors.length)];
-                grid[next.y][next.x] = 0;
-                grid[current.y + next.dy / 2][current.x + next.dx / 2] = 0;
-                stack.push({ x: next.x, y: next.y });
-            } else {
-                stack.pop();            }
-        }
-        
-        const offsetX = 50;
-        const offsetY = 50;
-        
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                if (grid[y][x] === 1) {
-                    const wx = offsetX + x * cellSize;
-                    const wy = offsetY + y * cellSize;
-                    
-                    if (x < cols - 1 && grid[y][x + 1] === 1) {
-                        walls.push(new Wall(wx, wy, wx + cellSize, wy, 'internal'));
-                    }
-                    if (y < rows - 1 && grid[y + 1][x] === 1) {
-                        walls.push(new Wall(wx, wy, wx, wy + cellSize, 'internal'));
-                    }
-                }
-            }
-        }
-        
-        walls.push(new Wall(0, 0, width, 0, 'border'));
-        walls.push(new Wall(width, 0, width, height, 'border'));
-        walls.push(new Wall(width, height, 0, height, 'border'));
-        walls.push(new Wall(0, height, 0, 0, 'border'));
-        
-        if (complexity > 0.5) {
-            const roomCount = Math.floor(2 + rng.next() * 3);
-            for (let r = 0; r < roomCount; r++) {
-                const rx = Math.floor(rng.next() * (cols - 4)) + 2;
-                const ry = Math.floor(rng.next() * (rows - 4)) + 2;
-                const rw = 2 + Math.floor(rng.next() * 3);
-                const rh = 2 + Math.floor(rng.next() * 3);
+                const x1 = cx - Math.cos(angle) * length / 2;
+                const y1 = cy - Math.sin(angle) * length / 2;
+                const x2 = cx + Math.cos(angle) * length / 2;
+                const y2 = cy + Math.sin(angle) * length / 2;
                 
-                for (let y = ry; y < ry + rh && y < rows - 1; y++) {
-                    for (let x = rx; x < rx + rw && x < cols - 1; x++) {
-                        grid[y][x] = 0;
+                valid = true;
+                for (const existing of walls) {
+                    if (Math.hypot((x1 + x2) / 2 - (existing.x1 + existing.x2) / 2, 
+                                   (y1 + y2) / 2 - (existing.y1 + existing.y2) / 2) < 100) {
+                        valid = false;
+                        break;
                     }
                 }
-            }
-        }
-        
-        return { walls, grid, cellSize, cols, rows };
-    },
-    
-    generateCoverClusters: function(width, height, clusterCount = 4, seed = null) {
-        const rng = seed ? new SeededRNG(seed + '_COVER') : { next: () => Math.random() };
-        const walls = [];
-        const margin = 60;        
-        for (let c = 0; c < clusterCount; c++) {
-            const cx = margin + rng.next() * (width - margin * 2);
-            const cy = margin + rng.next() * (height - margin * 2);
-            const length = 80 + rng.next() * 120;
-            const angle = rng.next() * Math.PI;
-            const x2 = cx + Math.cos(angle) * length;
-            const y2 = cy + Math.sin(angle) * length;
-            walls.push(new Wall(cx, cy, x2, y2, 'cover'));
+                
+                if (valid && (x1 < margin || x1 > width - margin || y1 < margin || y1 > height - margin ||
+                              x2 < margin || x2 > width - margin || y2 < margin || y2 > height - margin)) {
+                    valid = false;
+                }
+                
+                if (valid) {
+                    wall = new Wall(x1, y1, x2, y2, 'internal');
+                }
+                attempts++;
+            }            
+            if (valid && wall) walls.push(wall);
         }
         
         walls.push(new Wall(0, 0, width, 0, 'border'));
@@ -529,22 +473,22 @@ window.arenaConfig = {
     enableConsolidation: true, enableFighting: true, enableRanged: true,
     enableHebbian: true, compactInputs: false, enableWeightInheritance: true,
     enableTactical: true, enableReflexPath: true,
-    enableHealthPacks: true, enableLowHealthHint: true, enableMazeGeneration: true,
+    enableHealthPacks: true, enableLowHealthHint: true, enableWalls: true,
     learningRate: 0.015, lambda: 0.95, gamma: 0.99, entropyCoeff: 0.01,
     mutationRate: 0.10, skillGrowthRate: 0.04, hebbianRate: 0.002,
     agentSpeed: 10, agentAcceleration: 0.3, agentFriction: 0.90,
     agentCollisionRadius: 22, agentMaxVelocity: 15,
     viewRadius: 250,
-    mazeComplexityRange: [0.6, 0.85], mazeCellSize: 60,
+    wallCount: 3, wallLength: 120,
     seed: 'ARENA_V6_PRO_' + Date.now().toFixed(0),
-    timestamp: Date.now(), version: '6.0.8-PROFESSIONAL',    ARCH: Object.freeze({
+    timestamp: Date.now(), version: '6.0.9-PROFESSIONAL',
+    ARCH: Object.freeze({
         INPUT_DIM: 64, INPUT_DIM_COMPACT: 25, EMBEDDING_DIM: 24, EMBEDDING_DIM_COMPACT: 16,
         HIDDEN1: 48, HIDDEN2: 36, OUTPUT_DIM: 16, MEMORY_DIM: 16, NUM_HEADS: 4,
         NUM_EXPERTS: 4, EXPERT_DIM: 36, POLICY_CONTEXT_DIM: 8, POLICY_SKILL_DIM: 5,
         POLICY_HIDDEN: 24, POLICY_MODES: 5, CRITIC_HIDDEN: 32, LOGICAL_WIDTH: 850, LOGICAL_HEIGHT: 580
     }),
-    PHYSICS: Object.freeze({
-        AGENT_COLLISION_RADIUS: 22, AGENT_REPULSION_STRENGTH: 2.5,
+    PHYSICS: Object.freeze({        AGENT_COLLISION_RADIUS: 22, AGENT_REPULSION_STRENGTH: 2.5,
         MAX_VELOCITY: 25, VELOCITY_DAMPING: 0.88,
         KNOCKBACK_MASS: 1.0, FRICTION_GROUND: 0.90,
         COLLISION_ELASTICITY: 0.5
@@ -586,14 +530,14 @@ window.arenaConfig = {
             flank: 60,
             approach: 30
         },
-        PHASE_DURATIONS: {            winding: 10,
+        PHASE_DURATIONS: {
+            winding: 10,
             executing: 1,
             completing: 1,
             evaluating: 1
         }
     }),
-    OUTPUT: Object.freeze({
-        D0_FORWARD: 'forward [0-1]',
+    OUTPUT: Object.freeze({        D0_FORWARD: 'forward [0-1]',
         D1_TURN: 'turn [-1 to 1] + prediction',
         D2_ATTACK: 'attack [0-1]',
         D3_DODGE: 'dodge [0-1]',
@@ -635,14 +579,14 @@ const Utils = Object.freeze({
         const sum = exps.reduce((s, x) => s + x, 0) || 1e-10;
         return exps.map(e => e / sum);
     },
-    logSoftmax: (arr, temp = 1) => {        if (!arr || !Array.isArray(arr) || arr.length === 0) return [];
+    logSoftmax: (arr, temp = 1) => {
+        if (!arr || !Array.isArray(arr) || arr.length === 0) return [];
         const max = Math.max(...arr);
         const logSumExp = max + Math.log(arr.reduce((s, x) => { const scaled = (x - max) / temp; return s + (scaled > 700 ? 0 : Math.exp(Math.min(scaled, 700))); }, 0) + 1e-10);
         return arr.map(v => ((v - max) / temp - logSumExp));
     },
     policyGradientLoss: (logProbs, advantages) => {
-        if (!logProbs?.length || !advantages?.length) return 0;
-        const len = Math.min(logProbs.length, advantages.length);
+        if (!logProbs?.length || !advantages?.length) return 0;        const len = Math.min(logProbs.length, advantages.length);
         if (len === 0) return 0;
         let sum = 0;
         for (let i = 0; i < len; i++) { const lp = Utils.safeNumber(logProbs[i], 0); const adv = Utils.safeNumber(advantages[i], 0); sum += lp * adv; }
@@ -684,14 +628,14 @@ const Utils = Object.freeze({
     },
     hasLineOfSight: (a, b, walls, wallRadius = 6) => {
         if (!a || !b) return false; if (!walls?.length) return true;
-        for (const w of walls) {            if (w instanceof Wall) {
+        for (const w of walls) {
+            if (w instanceof Wall) {
                 if (w.blocksLineOfSight(a.x, a.y, b.x, b.y)) return false;
             } else {
                 const d = Utils._pointSegDist(a.x, a.y, b.x, b.y, w.x, w.y);
                 if (d < wallRadius + 2) return false;
             }
-        }
-        return true;
+        }        return true;
     },
     projectInput: (rawInputs, embeddingWeights, bias, outputDim) => {
         const projected = new Array(outputDim).fill(0);
@@ -733,14 +677,14 @@ const Utils = Object.freeze({
         }
         return out;
     },
-    linearMultiply: (vec, mat) => {        if (!vec?.length || !mat?.length || !mat[0]?.length) return new Float32Array(0);
+    linearMultiply: (vec, mat) => {
+        if (!vec?.length || !mat?.length || !mat[0]?.length) return new Float32Array(0);
         const out = new Float32Array(mat[0].length);
         for (let i = 0; i < mat[0].length; i++) { for (let j = 0; j < vec.length; j++) { out[i] += Utils.safeNumber(vec[j], 0) * Utils.safeNumber(mat[j]?.[i], 0); } }
         return out;
     },
     projectToCortexSensors: (rawInputs, config) => {
-        const output = new Float32Array(config.DIM_SENSOR); const src = rawInputs || []; const srcLen = Math.min(src.length, config.DIM_SENSOR);
-        for (let i = 0; i < srcLen; i++) { output[i] = Utils.clamp(Utils.safeNumber(src[i], 0), -1, 1); }
+        const output = new Float32Array(config.DIM_SENSOR); const src = rawInputs || []; const srcLen = Math.min(src.length, config.DIM_SENSOR);        for (let i = 0; i < srcLen; i++) { output[i] = Utils.clamp(Utils.safeNumber(src[i], 0), -1, 1); }
         const seed = config?.seed || arenaConfig?.seed || 'CORTEX2_DEFAULT';
         for (let i = srcLen; i < config.DIM_SENSOR; i++) { const hash = Utils.hashSeed(seed, i, 0xDEADBEEF); output[i] = (hash * 2 - 1) * 0.05; }
         return output;
@@ -782,14 +726,14 @@ const Utils = Object.freeze({
         return wThreat * hpFactor * (0.7 + speedFactor * 0.3) * (1 - (target.stats?.dodgeChance || 0) * 0.5);
     },
     fastMath: {
-        hypotFast: (a, b) => {            a = Math.abs(a); b = Math.abs(b);
+        hypotFast: (a, b) => {
+            a = Math.abs(a); b = Math.abs(b);
             if (a < b) { const t = a; a = b; b = t; }
             if (a === 0) return 0;
             const ratio = b / a;
             return a * Math.sqrt(1 + ratio * ratio);
         },
-        clampInline: (v, min, max) => v < min ? min : (v > max ? max : v),
-        normalizeFast: (x, y) => {
+        clampInline: (v, min, max) => v < min ? min : (v > max ? max : v),        normalizeFast: (x, y) => {
             const lenSq = x*x + y*y;
             if (lenSq === 0) return { x: 0, y: 0 };
             const invLen = 1 / Math.sqrt(lenSq);
@@ -831,14 +775,14 @@ class SeededRNG {
     next() {
         let x = this._state;
         x ^= x << 13;
-        x ^= x >>> 17;        x ^= x << 5;
+        x ^= x >>> 17;
+        x ^= x << 5;
         this._state = x >>> 0;
         this._callCount++;
         return (x * 0x2545F4914F6CDD1D) >>> 0 / 4294967296;
     }
     deriveWeights(rows, cols, scale) {
-        const weights = [];
-        for (let i = 0; i < rows; i++) {
+        const weights = [];        for (let i = 0; i < rows; i++) {
             const row = new Float32Array(cols);
             for (let j = 0; j < cols; j++) {
                 const hash = Utils.hashSeed(String(this._baseSeed), i * 1000 + j, 0);
@@ -880,14 +824,14 @@ class Cortex2Brain {
         this.lambda = config.lambda ?? arenaConfig.lambda;
         this.hebbianRate = config.hebbianRate ?? arenaConfig.hebbianRate;
 
-        this.W_P = this._initMatrix(400, this.DIM.DIM_P, 0.3);        this.b_P = this._initVector(this.DIM.DIM_P, 0.1);
+        this.W_P = this._initMatrix(400, this.DIM.DIM_P, 0.3);
+        this.b_P = this._initVector(this.DIM.DIM_P, 0.1);
 
         this.W_A = [];
         this.b_A = [];
         for (let h = 0; h < this.DIM.NUM_HEADS; h++) {
             this.W_A.push(this._initMatrix(160, this.DIM.HEAD_DIM, 0.3));
-            this.b_A.push(this._initVector(this.DIM.HEAD_DIM, 0.1));
-        }
+            this.b_A.push(this._initVector(this.DIM.HEAD_DIM, 0.1));        }
 
         this.W_gate = this._initVector(this.DIM.NUM_HEADS, 0.25);
         this.W_reflex = this._initVector(4, 0.5);
@@ -929,14 +873,14 @@ class Cortex2Brain {
         this.D_prev = this._rng.deriveVector(this.DIM.DIM_D, 0.05);
 
         this._initEligibilityTraces();
-        this.predictionErrors = new Float32Array(48);        this.consolidationBuffer = [];
+        this.predictionErrors = new Float32Array(48);
+        this.consolidationBuffer = [];
         this.maxBuffer = 32;
 
         this._stats = {
             tdErrorHistory: [],
             predictionErrorHistory: [],
-            totalSteps: 0,
-            avgReward: 0,
+            totalSteps: 0,            avgReward: 0,
             kills: 0,
             deaths: 0,
             reflexTriggers: 0,
@@ -978,14 +922,14 @@ class Cortex2Brain {
             frustration: { baseDuration: 240, intensityMultiplier: 2.5, satisfactionDecay: 0.01 },
             desperation: { baseDuration: 300, intensityMultiplier: 3.0, satisfactionDecay: 0.005 },
             confidence: { baseDuration: 150, intensityMultiplier: 1.2, satisfactionDecay: 0.04 },
-            vengeance: { baseDuration: 360, intensityMultiplier: 3.5, satisfactionDecay: 0.003 }        };
+            vengeance: { baseDuration: 360, intensityMultiplier: 3.5, satisfactionDecay: 0.003 }
+        };
 
         this.emotionDecay = arenaConfig.EMOTION.DECAY_RATE;
         this.emotionInfluence = arenaConfig.EMOTION.INFLUENCE_WEIGHT;
         this.step = 0;
         this.cumulativeReward = 0;
-        this.health = 100;
-        this.stats = { maxHealth: 100 };
+        this.health = 100;        this.stats = { maxHealth: 100 };
         this._lastKiller = null;
         
         this.predictedPos60 = { x: 0, y: 0 };
@@ -1027,14 +971,14 @@ class Cortex2Brain {
                 }
             }
             const norm = Math.hypot(...v_new);
-            if (norm < 1e-10) break;            v = v_new.map(x => x / norm);
+            if (norm < 1e-10) break;
+            v = v_new.map(x => x / norm);
         }
         const Wv = new Float32Array(W.length);
         for (let i = 0; i < W.length; i++) {
             for (let j = 0; j < W[0].length; j++) {
                 Wv[i] += W[i][j] * v[j];
-            }
-        }
+            }        }
         const estimated_rho = Math.hypot(...Wv);
         const factor = target_rho / (estimated_rho + 1e-8);
         for (let i = 0; i < W.length; i++) {
@@ -1076,15 +1020,14 @@ class Cortex2Brain {
         for (let i = 0; i < this.DIM.DIM_SENSOR; i++) input[idx++] = x_t[i];
         for (let i = 0; i < this.DIM.DIM_C; i++) input[idx++] = C_prev[i];
         for (let i = 0; i < this.DIM.DIM_S; i++) input[idx++] = S_prev[i];
-                const key = Utils.linearMultiply(
+        const key = Utils.linearMultiply(
             [...Array.from(x_t).slice(0, 16), ...Array.from(S_prev).slice(0, 16)],
             this.W_key, 'linear'
         );
         
         for (let i = 0; i < 48; i++) {
             let relevance = 0;
-            for (let j = 0; j < 32; j++) {
-                relevance += key[j] * M_perm_prev[i * 48 + j];
+            for (let j = 0; j < 32; j++) {                relevance += key[j] * M_perm_prev[i * 48 + j];
             }
             relevance = Utils.sigmoid(relevance);
             input[idx++] = M_perm_prev[i] * relevance;
@@ -1125,15 +1068,15 @@ class Cortex2Brain {
         return input;
     }
 
-    _buildMPredInput(A_t, C_prev, M_work, D_prev) {        const input = new Float32Array(192);
+    _buildMPredInput(A_t, C_prev, M_work, D_prev) {
+        const input = new Float32Array(192);
         let idx = 0;
         for (let i = 0; i < this.DIM.DIM_A; i++) input[idx++] = A_t[i];
         for (let i = 0; i < 64; i++) {
             const cIdx = 192 + i;
             input[idx++] = (cIdx < this.DIM.DIM_C) ? C_prev[cIdx] : 0;
         }
-        for (let i = 0; i < 48; i++) input[idx++] = M_work[i];
-        for (let i = 0; i < this.DIM.DIM_D; i++) input[idx++] = D_prev[i];
+        for (let i = 0; i < 48; i++) input[idx++] = M_work[i];        for (let i = 0; i < this.DIM.DIM_D; i++) input[idx++] = D_prev[i];
         return input;
     }
 
@@ -1182,8 +1125,7 @@ class Cortex2Brain {
         
         for (let i = 0; i < 48; i++) {
             const error = Math.abs(x_pred[i] - x_t[i]);
-            this.predictionErrors[i] = Utils.lerp(this.predictionErrors[i], error, 0.1);
-        }
+            this.predictionErrors[i] = Utils.lerp(this.predictionErrors[i], error, 0.1);        }
         
         const enemyVx = x_t[4] || 0;
         const enemyVy = x_t[5] || 0;
@@ -1223,7 +1165,8 @@ class Cortex2Brain {
         }
     }
 
-    _computeAvgPredError() {        let sum = 0;
+    _computeAvgPredError() {
+        let sum = 0;
         for (let i = 0; i < 48; i++) sum += this.predictionErrors[i];
         return sum / 48;
     }
@@ -1231,8 +1174,7 @@ class Cortex2Brain {
     _checkReflexPath(x_t, S_new, D_new) {
         const emotionModulator = this.emotionInfluence;
         if (S_new[8] > 0.6) {
-            this._stats.reflexTriggers++;
-            D_new[6] = Utils.lerp(D_new[6], Math.min(1, D_new[6] + 0.4), emotionModulator);
+            this._stats.reflexTriggers++;            D_new[6] = Utils.lerp(D_new[6], Math.min(1, D_new[6] + 0.4), emotionModulator);
             D_new[4] = Utils.lerp(D_new[4], Math.min(1, D_new[4] + 0.3), emotionModulator);
         }
         if (S_new[7] > 0.6) {
@@ -1281,8 +1223,7 @@ class Cortex2Brain {
             }
             indexed.sort((a, b) => b.v - a.v);
             for (let i = 0; i < Math.min(count, indexed.length); i++) {
-                all.push(indexed[i]);
-            }
+                all.push(indexed[i]);            }
         };
         addTop(this.P, 0, 2);
         addTop(this.A, 32, 2);
@@ -1321,7 +1262,8 @@ class Cortex2Brain {
         if (this.emotionalState.current) {
             this.emotionalState.history.push({
                 ...this.emotionalState.current,
-                endStep: this.step,                reason: 'transition'
+                endStep: this.step,
+                reason: 'transition'
             });
             if (this.emotionalState.history.length > 5) {
                 this.emotionalState.history.shift();
@@ -1330,8 +1272,7 @@ class Cortex2Brain {
         this.emotionalState.current = {
             name, intensity, initialIntensity: intensity,
             baseDuration: config.baseDuration,
-            remainingFrames: Math.floor(config.baseDuration * intensity * config.intensityMultiplier),
-            satisfaction: this.emotionalState.satisfaction,
+            remainingFrames: Math.floor(config.baseDuration * intensity * config.intensityMultiplier),            satisfaction: this.emotionalState.satisfaction,
             startStep: this.step
         };
     }
@@ -1370,7 +1311,8 @@ class Cortex2Brain {
     _checkEmotionTransition(state) {
         const current = state.name;
         if (current === 'fear' && this.emotions.desperation > 0.7) {
-            return { name: 'desperation', intensity: this.emotions.desperation };        }
+            return { name: 'desperation', intensity: this.emotions.desperation };
+        }
         if (current === 'frustration' && this.emotions.aggression > 0.6) {
             return { name: 'aggression', intensity: this.emotions.aggression };
         }
@@ -1379,8 +1321,7 @@ class Cortex2Brain {
         }
         if (current === 'desperation' && state.intensity < 0.4) {
             return { name: 'fear', intensity: this.emotions.fear };
-        }
-        if (current === 'vengeance' && state.satisfaction > 0.5) {
+        }        if (current === 'vengeance' && state.satisfaction > 0.5) {
             return { name: 'confidence', intensity: this.emotions.confidence };
         }
         return null;
@@ -1419,7 +1360,8 @@ class Cortex2Brain {
                     this.emotionalState.satisfaction = Utils.clamp(this.emotionalState.satisfaction + 0.5, -1, 1);
                     if (this.emotionalState.current?.name === 'aggression' || this.emotionalState.current?.name === 'vengeance') {
                         this._exitEmotion(this.emotionalState.current, 'satisfied');
-                    }                    if (event.target === this.emotionMemory.killer) {
+                    }
+                    if (event.target === this.emotionMemory.killer) {
                         this.emotions.vengeance = 0;
                         this.emotionMemory.killer = null;
                         this.emotionMemory.grudge.delete(event.target);
@@ -1428,8 +1370,7 @@ class Cortex2Brain {
                 case 'killed_by':
                     if (event.killer) {
                         this.emotionMemory.killer = event.killer;
-                        const grudge = this.emotionMemory.grudge.get(event.killer) || 0;
-                        this.emotionMemory.grudge.set(event.killer, Utils.clamp(grudge + 0.5, -1, 1));
+                        const grudge = this.emotionMemory.grudge.get(event.killer) || 0;                        this.emotionMemory.grudge.set(event.killer, Utils.clamp(grudge + 0.5, -1, 1));
                         this.emotions.vengeance = Math.min(1, this.emotions.vengeance + 0.6);
                     }
                     break;
@@ -1468,7 +1409,8 @@ class Cortex2Brain {
             }
         }
         if (r_t < 0.1) {
-            this.emotions.frustration = Math.min(1, this.emotions.frustration + 0.03);        } else {
+            this.emotions.frustration = Math.min(1, this.emotions.frustration + 0.03);
+        } else {
             this.emotions.frustration *= 0.92;
         }
         const normalizedReward = Utils.clamp((this.cumulativeReward + 100) / 200, 0, 1);
@@ -1477,8 +1419,7 @@ class Cortex2Brain {
         } else {
             this.emotions.desperation *= 0.85;
         }
-        if (r_t > 1) {
-            this.emotions.confidence = Math.min(1, this.emotions.confidence + 0.05);
+        if (r_t > 1) {            this.emotions.confidence = Math.min(1, this.emotions.confidence + 0.05);
         } else {
             this.emotions.confidence *= 0.95;
         }
@@ -1517,7 +1458,8 @@ class Cortex2Brain {
         this.S[5] = this.emotions.surprise;
         this.S[6] = this.emotions.caution;
         this.S[7] = this.emotions.desperation;
-        this.S[8] = this.emotions.vengeance;        for (const key of Object.keys(this.emotions)) {
+        this.S[8] = this.emotions.vengeance;
+        for (const key of Object.keys(this.emotions)) {
             this.emotions[key] *= this.emotionDecay;
         }
         this._lastReward = r_t;
@@ -1526,8 +1468,7 @@ class Cortex2Brain {
     storeEmotionalMemory() {
         this.emotionMemory = {
             trauma: this.emotionMemory.trauma + (this.emotions.fear * 0.3),
-            grudge: new Map(this.emotionMemory.grudge),
-            lastEmotion: this.emotionalState.current ? { ...this.emotionalState.current } : this.emotionMemory.lastEmotion,
+            grudge: new Map(this.emotionMemory.grudge),            lastEmotion: this.emotionalState.current ? { ...this.emotionalState.current } : this.emotionMemory.lastEmotion,
             unresolved: this.emotionMemory.unresolved,
             killer: this._lastKiller,
             timestamp: Date.now()
@@ -1566,7 +1507,7 @@ class Cortex2Brain {
         
         const aggression = Utils.sigmoid(D_raw[4]);
         const defense = Utils.sigmoid(D_raw[6]);
-        const confidence = Utils.sigmoid(D_raw[8]);        
+        const confidence = Utils.sigmoid(D_raw[8]);
         D[2] = D[2] * (0.5 + 0.5 * aggression) * (0.7 + 0.3 * confidence);
         D[0] = D[0] * (1 - 0.3 * defense);
         
@@ -1576,7 +1517,6 @@ class Cortex2Brain {
         
         return D;
     }
-
     _calculateIntrinsicReward(x_t, x_pred) {
         const novelty = Math.hypot(...Array.from(x_t).map((v, i) => v - x_pred[i])) / x_t.length;
         const curiosity_reward = novelty * Math.exp(-novelty);
@@ -1615,7 +1555,8 @@ class Cortex2Brain {
         for (let i = 0; i < 48; i++) M_work_new[i] = Utils.leakyRelu(M_work_new[i] + this.b_M_work[i]);
         const M_perm_new = Utils.matrixMultiply(M_perm_input, this.W_M_perm, 'relu');
         for (let i = 0; i < 48; i++) M_perm_new[i] = Utils.leakyRelu(M_perm_new[i] + this.b_M_perm[i]);
-        const M_pred_new = Utils.matrixMultiply(M_pred_input, this.W_M_pred, 'relu');        for (let i = 0; i < 48; i++) M_pred_new[i] = Utils.leakyRelu(M_pred_new[i] + this.b_M_pred[i]);
+        const M_pred_new = Utils.matrixMultiply(M_pred_input, this.W_M_pred, 'relu');
+        for (let i = 0; i < 48; i++) M_pred_new[i] = Utils.leakyRelu(M_pred_new[i] + this.b_M_pred[i]);
         const M_new = new Float32Array(this.DIM.DIM_M);
         for (let i = 0; i < 48; i++) M_new[i] = M_work_new[i];
         for (let i = 0; i < 48; i++) M_new[48 + i] = M_perm_new[i];
@@ -1625,8 +1566,7 @@ class Cortex2Brain {
         const S_new = Utils.matrixMultiply(S_input, this.W_S, 'relu');
         for (let i = 0; i < this.DIM.DIM_S; i++) S_new[i] = Utils.leakyRelu(S_new[i] + this.b_S[i]);
         const D_new = Utils.matrixMultiply(D_input, this.W_D, 'tanh');
-        for (let i = 0; i < this.DIM.DIM_D; i++) D_new[i] = Utils.tanh(D_new[i] + this.b_D[i]);
-        this.P_prev.set(this.P); this.A_prev.set(this.A); this.M_prev.set(this.M);
+        for (let i = 0; i < this.DIM.DIM_D; i++) D_new[i] = Utils.tanh(D_new[i] + this.b_D[i]);        this.P_prev.set(this.P); this.A_prev.set(this.A); this.M_prev.set(this.M);
         this.C_prev.set(this.C); this.S_prev.set(this.S); this.D_prev.set(this.D);
         this.P.set(P_new); this.A.set(A_new); this.M.set(M_new);
         this.C.set(C_new); this.S.set(S_new); this.D.set(D_new);
@@ -1664,7 +1604,8 @@ class Cortex2Brain {
         
         return {
             output: Array.from(D_constrained),
-            cortex: Array.from(this.C),            predictionError: this._computeAvgPredError(),
+            cortex: Array.from(this.C),
+            predictionError: this._computeAvgPredError(),
             predictionError60: this.predictionError60,
             predictedPos60: { ...this.predictedPos60 },
             predictedTrajectory: { ...this.predictedTrajectory },
@@ -1674,7 +1615,6 @@ class Cortex2Brain {
             intrinsicReward: this._calculateIntrinsicReward(x_t, x_pred)
         };
     }
-
     tdLearn(inputs, outputs, reward, value, nextValue, actionLogProbs = null) {
         const currentValue = value !== undefined && value !== null ? Utils.safeNumber(value, 0) : this._estimateValue();
         const nextVal = nextValue !== undefined && nextValue !== null ? Utils.safeNumber(nextValue, 0) : this._estimateValue();
@@ -1713,7 +1653,8 @@ class Cortex2Brain {
             tdError: tdErr,
             avgTDError: this._stats.tdErrorHistory.reduce((a,b)=>a+b,0)/Math.max(1,this._stats.tdErrorHistory?.length || 1),
             avgPredictionError: this._computeAvgPredError(),
-            predictionError60: this.predictionError60        };
+            predictionError60: this.predictionError60
+        };
     }
 
     _updateEligibilityTraces(inputs, outputs, tdErr) {
@@ -1723,8 +1664,7 @@ class Cortex2Brain {
                 const idx = i * this.DIM.DIM_P + j;
                 this.trace_P[idx] = decay * this.trace_P[idx] + inputs[i] * this.P[j];
                 this.trace_P[idx] = Utils.clamp(this.trace_P[idx], -10, 10);
-            }
-        }
+            }        }
         for (let i = 0; i < 289; i++) {
             for (let j = 0; j < this.DIM.DIM_C; j++) {
                 const idx = i * this.DIM.DIM_C + j;
@@ -1762,7 +1702,8 @@ class Cortex2Brain {
     _getAffectedSubsystems(errorType) {
         const map = {
             'td': [{ start: 64, end: 128, lr: 0.01 }, { start: 128, end: 192, lr: 0.03 }],
-            'prediction': [{ start: 0, end: 64, lr: 0.10 }],            'emotion': [{ start: 192, end: 256, lr: 0.001 }],
+            'prediction': [{ start: 0, end: 64, lr: 0.10 }],
+            'emotion': [{ start: 192, end: 256, lr: 0.001 }],
             'hebbian': [{ start: 0, end: 64, lr: 0.10 }, { start: 64, end: 128, lr: 0.01 }]
         };
         return map[errorType] || [{ start: 64, end: 128, lr: 0.01 }];
@@ -1772,8 +1713,7 @@ class Cortex2Brain {
         if (!arenaConfig.enableHebbian || !pre?.length || !post?.length) return;
         const eta = this.hebbianRate * correlation * 0.5;
         const step = Math.max(1, Math.floor(pre.length / 50));
-        for (let i = 0; i < post.length; i += step) {
-            for (let j = 0; j < pre.length; j += step) {
+        for (let i = 0; i < post.length; i += step) {            for (let j = 0; j < pre.length; j += step) {
                 const delta = eta * pre[j] * post[i];
                 if (label === 'P→A' && i < this.DIM.DIM_A) {
                     const headIdx = Math.floor(i / this.DIM.HEAD_DIM);
@@ -1811,7 +1751,8 @@ class Cortex2Brain {
             if (total <= 0) return;
             let rand = this._rng.next() * total;
             let selected = this.consolidationBuffer[0];
-            for (const item of this.consolidationBuffer) {                rand -= item.priority;
+            for (const item of this.consolidationBuffer) {
+                rand -= item.priority;
                 if (rand <= 0) { selected = item; break; }
             }
             this.M[48 + selected.idx] = Utils.lerp(this.M[48 + selected.idx], selected.value, 0.2);
@@ -1821,8 +1762,7 @@ class Cortex2Brain {
         }
         if (this.consolidationBuffer.length > this.maxBuffer) {
             this.consolidationBuffer.sort((a, b) => b.priority - a.priority);
-            this.consolidationBuffer.length = this.maxBuffer;
-        }
+            this.consolidationBuffer.length = this.maxBuffer;        }
     }
 
     mutate(rate = 0.1, strength = 0.1) {
@@ -1871,8 +1811,7 @@ class Cortex2Brain {
         clone.W_A = this.W_A.map(copyMat); clone.b_A = this.b_A.map(b => new Float32Array(b));
         clone.W_gate = new Float32Array(this.W_gate); clone.W_reflex = new Float32Array(this.W_reflex);
         clone.W_M_work = copyMat(this.W_M_work); clone.b_M_work = new Float32Array(this.b_M_work);
-        clone.W_M_perm = copyMat(this.W_M_perm); clone.b_M_perm = new Float32Array(this.b_M_perm);
-        clone.W_M_pred = copyMat(this.W_M_pred); clone.b_M_pred = new Float32Array(this.b_M_pred);
+        clone.W_M_perm = copyMat(this.W_M_perm); clone.b_M_perm = new Float32Array(this.b_M_perm);        clone.W_M_pred = copyMat(this.W_M_pred); clone.b_M_pred = new Float32Array(this.b_M_pred);
         clone.W_C = copyMat(this.W_C); clone.b_C = new Float32Array(this.b_C);
         clone.W_S = copyMat(this.W_S); clone.b_S = new Float32Array(this.b_S);
         clone.W_D = copyMat(this.W_D); clone.b_D = new Float32Array(this.b_D);
@@ -1921,8 +1860,7 @@ class Cortex2Brain {
                 W_P: this.W_P.map(r => Array.from(r)), b_P: Array.from(this.b_P),
                 W_A: this.W_A.map(m => m.map(r => Array.from(r))), b_A: this.b_A.map(b => Array.from(b)),
                 W_gate: Array.from(this.W_gate), W_reflex: Array.from(this.W_reflex),
-                W_M_work: this.W_M_work.map(r => Array.from(r)), b_M_work: Array.from(this.b_M_work),
-                W_M_perm: this.W_M_perm.map(r => Array.from(r)), b_M_perm: Array.from(this.b_M_perm),
+                W_M_work: this.W_M_work.map(r => Array.from(r)), b_M_work: Array.from(this.b_M_work),                W_M_perm: this.W_M_perm.map(r => Array.from(r)), b_M_perm: Array.from(this.b_M_perm),
                 W_M_pred: this.W_M_pred.map(r => Array.from(r)), b_M_pred: Array.from(this.b_M_pred),
                 W_C: this.W_C.map(r => Array.from(r)), b_C: Array.from(this.b_C),
                 W_S: this.W_S.map(r => Array.from(r)), b_S: Array.from(this.b_S),
@@ -1958,7 +1896,8 @@ class Cortex2Brain {
 
     static fromJSON(data) {
         if (!data || data.type !== 'Cortex2Brain' || !data.config) return new Cortex2Brain({});
-        const brain = new Cortex2Brain(data.config);        try {
+        const brain = new Cortex2Brain(data.config);
+        try {
             const w = data.weights;
             brain.W_P = w.W_P.map(r => new Float32Array(r)); brain.b_P = new Float32Array(w.b_P);
             brain.W_A = w.W_A.map(m => m.map(r => new Float32Array(r))); brain.b_A = w.b_A.map(b => new Float32Array(b));
@@ -1970,8 +1909,7 @@ class Cortex2Brain {
             brain.W_C = w.W_C.map(r => new Float32Array(r)); brain.b_C = new Float32Array(w.b_C);
             brain.W_S = w.W_S.map(r => new Float32Array(r)); brain.b_S = new Float32Array(w.b_S);
             brain.W_D = w.W_D.map(r => new Float32Array(r)); brain.b_D = new Float32Array(w.b_D);
-            brain.W_pred = w.W_pred.map(r => new Float32Array(r)); brain.b_pred = new Float32Array(w.b_pred);
-            if (w.W_V) { brain.W_V = new Float32Array(w.W_V); brain.b_V = w.b_V ?? 0; }
+            brain.W_pred = w.W_pred.map(r => new Float32Array(r)); brain.b_pred = new Float32Array(w.b_pred);            if (w.W_V) { brain.W_V = new Float32Array(w.W_V); brain.b_V = w.b_V ?? 0; }
             if (w.W_key) brain.W_key = new Float32Array(w.W_key);
             const s = data.state;
             brain.P.set(s.P); brain.A.set(s.A); brain.M.set(s.M);
@@ -2020,8 +1958,7 @@ class Cortex2Brain {
             emotions: { ...this.emotions },
             emotionalState: this.emotionalState.current ? { ...this.emotionalState.current } : null,
             prediction: {
-                pos60: this.predictedPos60,
-                error60: this.predictionError60.toFixed(2),
+                pos60: this.predictedPos60,                error60: this.predictionError60.toFixed(2),
                 trajectory: this.predictedTrajectory
             }
         };
@@ -2056,7 +1993,8 @@ class CriticNetwork {
             inputs = new Array(this.inputDim).fill(0);
         }
         const hidden = [];
-        for (let o = 0; o < this.hidden; o++) {            let sum = Utils.safeNumber(this._b1[o], 0);
+        for (let o = 0; o < this.hidden; o++) {
+            let sum = Utils.safeNumber(this._b1[o], 0);
             for (let i = 0; i < inputs.length; i++) {
                 sum += Utils.safeNumber(inputs[i], 0) * Utils.safeNumber(this._W1[i]?.[o], 0);
             }
@@ -2069,8 +2007,7 @@ class CriticNetwork {
         return Utils.clamp(value, -10, 10);
     }
     update(inputs, reward, nextValue, alpha = null) {
-        const currentValue = this.forward(inputs);
-        const tdErr = Utils.tdError(reward, currentValue, nextValue, this.gamma);
+        const currentValue = this.forward(inputs);        const tdErr = Utils.tdError(reward, currentValue, nextValue, this.gamma);
         const lr = alpha ?? this.lr;
         this._b2 += lr * tdErr;
         return { tdError: tdErr, value: currentValue };
@@ -2105,7 +2042,8 @@ class CriticNetwork {
 }
 
 class PolicySelector {
-    constructor(config = {}) {        this.contextDim = config.contextDim ?? arenaConfig.ARCH.POLICY_CONTEXT_DIM;
+    constructor(config = {}) {
+        this.contextDim = config.contextDim ?? arenaConfig.ARCH.POLICY_CONTEXT_DIM;
         this.skillEmbeddingDim = config.skillEmbeddingDim ?? arenaConfig.ARCH.POLICY_SKILL_DIM;
         this.hidden = config.hidden ?? arenaConfig.ARCH.POLICY_HIDDEN;
         this.numModes = config.numModes ?? arenaConfig.ARCH.POLICY_MODES;
@@ -2118,8 +2056,7 @@ class PolicySelector {
     }
     forward(context, skillEmbedding) {
         const combined = [...(context || []), ...(skillEmbedding || [])];
-        const hidden = [];
-        for (let o = 0; o < this.hidden; o++) {
+        const hidden = [];        for (let o = 0; o < this.hidden; o++) {
             let sum = Utils.safeNumber(this._b1[o], 0);
             for (let i = 0; i < combined.length; i++) {
                 sum += Utils.safeNumber(combined[i], 0) * Utils.safeNumber(this._W1[i]?.[o], 0);
@@ -2154,7 +2091,8 @@ class PolicySelector {
             seed: this.seed + '_clone', lr: this.lr
         });
         clone._W1 = this._W1.map(r => r.slice());
-        clone._W2 = this._W2.map(r => r.slice());        clone._b1 = this._b1.slice();
+        clone._W2 = this._W2.map(r => r.slice());
+        clone._b1 = this._b1.slice();
         return clone;
     }
     toJSON() {
@@ -2167,8 +2105,7 @@ class PolicySelector {
         if (!data?.config) return new PolicySelector({});
         const ps = new PolicySelector(data.config);
         ps._W1 = (data.W1 || []).map(r => (r || []).slice());
-        ps._W2 = (data.W2 || []).map(r => (r || []).slice());
-        ps._b1 = (data.b1 || []).slice();
+        ps._W2 = (data.W2 || []).map(r => (r || []).slice());        ps._b1 = (data.b1 || []).slice();
         return ps;
     }
 }
@@ -2203,7 +2140,8 @@ class HealthPack {
         this.healAmount = healAmount;
         this.lifetime = lifetime;
         this.radius = 12;
-        this.collected = false;        this.pulsePhase = 0;
+        this.collected = false;
+        this.pulsePhase = 0;
         this.color = '#00ff9d';
     }
     
@@ -2216,8 +2154,7 @@ class HealthPack {
     draw(ctx) {
         if (this.collected) return;
         const pulse = 1 + Math.sin(this.pulsePhase) * 0.15;
-        const r = this.radius * pulse;
-        
+        const r = this.radius * pulse;        
         const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 2);
         gradient.addColorStop(0, 'rgba(0, 255, 157, 0.4)');
         gradient.addColorStop(0.5, 'rgba(0, 255, 157, 0.1)');
@@ -2252,7 +2189,8 @@ class HealthPack {
                  lifetime: this.lifetime, collected: this.collected, pulsePhase: this.pulsePhase };
     }
     
-    static fromJSON(data) {        const pack = new HealthPack(data.x, data.y, data.healAmount, data.lifetime);
+    static fromJSON(data) {
+        const pack = new HealthPack(data.x, data.y, data.healAmount, data.lifetime);
         pack.collected = data.collected;
         pack.pulsePhase = data.pulsePhase || 0;
         return pack;
@@ -2265,8 +2203,7 @@ class HealthPack {
 
 class Agent {
     static get VISUAL_RADIUS() { return 22; }
-    static get COLLISION_RADIUS() { return 22; }
-    static get ATTACK_RANGE() { return 45; }
+    static get COLLISION_RADIUS() { return 22; }    static get ATTACK_RANGE() { return 45; }
 
     constructor(id, x, y, color, seed, weaponType = 'hammer', team = 'blue') {
         this.id = id; this.x = x; this.y = y; this.color = color;
@@ -2301,7 +2238,8 @@ class Agent {
         this.policySelector = new PolicySelector({
             contextDim: arenaConfig.ARCH.POLICY_CONTEXT_DIM,
             skillEmbeddingDim: arenaConfig.ARCH.POLICY_SKILL_DIM,
-            hidden: arenaConfig.ARCH.POLICY_HIDDEN,            numModes: arenaConfig.ARCH.POLICY_MODES,
+            hidden: arenaConfig.ARCH.POLICY_HIDDEN,
+            numModes: arenaConfig.ARCH.POLICY_MODES,
             seed: seed + '_POLICY_' + id,
             lr: arenaConfig.learningRate * 0.6
         });
@@ -2314,8 +2252,7 @@ class Agent {
             killerHistory: [], allianceHistory: [], favors: new Map(), groupAffiliation: null
         };
         this.permanent = {
-            skills: { hunting: 0.3, fleeing: 0.4, combat: 0.2, exploring: 0.5, avoiding: 0.6 },
-            strategies: { huntPattern: 'direct', fleeDirection: 'away', combatStyle: 'direct' },
+            skills: { hunting: 0.3, fleeing: 0.4, combat: 0.2, exploring: 0.5, avoiding: 0.6 },            strategies: { huntPattern: 'direct', fleeDirection: 'away', combatStyle: 'direct' },
             preferences: { foodType: 'any', enemyType: 'any', territory: 'any' },
             muscleMemory: new Float32Array(16).fill(0),
             memory: { lastFoodPos: null, lastFoodStep: 0, visited: new Set(), unvisited: [] }
@@ -2350,7 +2287,8 @@ class Agent {
                 const predVx = (last.x - prev.x) / dt;
                 const predVy = (last.y - prev.y) / dt;
                 return {
-                    x: last.x + predVx * secondsAhead,                    y: last.y + predVy * secondsAhead
+                    x: last.x + predVx * secondsAhead,
+                    y: last.y + predVy * secondsAhead
                 };
             }
         })();
@@ -2363,8 +2301,7 @@ class Agent {
                 else { hist.losses++; }
             }
         })();
-        this.currentTactic = 'assault';
-        this.fightStartTime = 0; this.fightOpponent = null;
+        this.currentTactic = 'assault';        this.fightStartTime = 0; this.fightOpponent = null;
         this.attackCooldown = 0; this.attackRange = this.weapon.range;
         this.wins = 0; this.totalKills = 0; this.deaths = 0; this.mutations = 0;
         this.generation = 1; this.trail = []; this.lastDecision = null;
@@ -2399,7 +2336,8 @@ class Agent {
             lastUpdate: 0,
             targetPriority: null
         };
-        this.assignedTargetId = null;        this.assignedRole = 'assault';
+        this.assignedTargetId = null;
+        this.assignedRole = 'assault';
         this.explorationTarget = null;
         this._combatTimer = 0;
         this.predictedIntercept = null;
@@ -2412,8 +2350,7 @@ class Agent {
         this._wasAttackingLastFrame = false;
         this._attackToggleTimer = 0;
         
-        this._targetDeathFrame = null;
-        this._targetSwitchFrame = null;
+        this._targetDeathFrame = null;        this._targetSwitchFrame = null;
     }
 
     _applyWeaponStats() {
@@ -2448,7 +2385,8 @@ class Agent {
             return hasLOS;
         }
         
-        return inArc;    }
+        return inArc;
+    }
 
     calculateDirectionalDamageMultiplier(attacker) {
         if (!attacker) return 1.0;
@@ -2461,8 +2399,7 @@ class Agent {
         else return arenaConfig.TACTICAL.DAMAGE_BACK;
     }
 
-    assessThreatFromEnemy(enemy) {
-        if (!enemy?.alive) return { threatLevel: 0, safeApproachAngle: 0, flankVector: {x:0, y:0} };
+    assessThreatFromEnemy(enemy) {        if (!enemy?.alive) return { threatLevel: 0, safeApproachAngle: 0, flankVector: {x:0, y:0} };
         const dist = Utils.dist(this, enemy);
         const inRange = dist <= (enemy.weapon.range || 50);
         const toMe = Math.atan2(this.y - enemy.y, this.x - enemy.x);
@@ -2511,8 +2448,7 @@ class Agent {
             const dx = entity.x - this.x;
             const dy = entity.y - this.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist <= viewRadius) {
-                this._enemyCache.push({
+            if (dist <= viewRadius) {                this._enemyCache.push({
                     id: entity.id,
                     dx: dx / viewRadius,
                     dy: dy / viewRadius,
@@ -2546,7 +2482,8 @@ class Agent {
         
         for (let i = 0; i < 3; i++) {
             const offset = 20 + i * 3;
-            if (i < allies.length) {                this._inputBuffer[offset] = allies[i].dx;
+            if (i < allies.length) {
+                this._inputBuffer[offset] = allies[i].dx;
                 this._inputBuffer[offset+1] = allies[i].dy;
                 this._inputBuffer[offset+2] = allies[i].dist;
             } else {
@@ -2560,8 +2497,7 @@ class Agent {
             this._inputBuffer[31] = this._enemyCache[0].vy;
         }
         
-        const targetDistribution = new Map();
-        allies.forEach(a => {
+        const targetDistribution = new Map();        allies.forEach(a => {
             if (a.targetId) {
                 targetDistribution.set(a.targetId, (targetDistribution.get(a.targetId) || 0) + 1);
             }
@@ -2595,7 +2531,8 @@ class Agent {
         this._inputBuffer[56] = (teamAlive - enemyAlive) / 4;
         this._inputBuffer[57] = this._calculateTargetConsensus(world);
         this._inputBuffer[58] = this.cumulativeReward / 100;
-        this._inputBuffer[59] = this._getLastTeamReward(world);        this._inputBuffer[60] = this._getTacticalUrgency(world);
+        this._inputBuffer[59] = this._getLastTeamReward(world);
+        this._inputBuffer[60] = this._getTacticalUrgency(world);
         
         const alliesUnderFire = allies.filter(a => a._lastHitReceived > 0 && a._lastHitReceived < 5).length;
         this._inputBuffer[61] = alliesUnderFire / Math.max(1, allies.length);
@@ -2609,8 +2546,7 @@ class Agent {
             }
         }
         
-        return Array.from(this._inputBuffer);
-    }
+        return Array.from(this._inputBuffer);    }
 
     _calculateTargetConsensus(world) {
         const team = this.team;
@@ -2644,7 +2580,8 @@ class Agent {
         let bestScore = -Infinity;
         this.mentalMap.enemies.forEach((enemy, id) => {
             if (enemy.confidence < 0.3) return;
-            const score = (enemy.threat * enemy.hp * enemy.confidence) / (enemy.dist + 0.1);            if (score > bestScore) {
+            const score = (enemy.threat * enemy.hp * enemy.confidence) / (enemy.dist + 0.1);
+            if (score > bestScore) {
                 bestScore = score;
                 bestTarget = { id, ...enemy };
             }
@@ -2658,8 +2595,7 @@ class Agent {
         
         if (this.mentalMap.targetPriority) {
             const targetExists = (world?.enemies || []).some(e => 
-                e.id === this.mentalMap.targetPriority.id && e.alive
-            );
+                e.id === this.mentalMap.targetPriority.id && e.alive            );
             if (!targetExists) {
                 this.mentalMap.targetPriority = null;
                 this._targetDeathFrame = currentStep;
@@ -2693,7 +2629,8 @@ class Agent {
             this.lastDecision = {
                 mode: 'explore',
                 behaviors,
-                inputs,                output: D,
+                inputs,
+                output: D,
                 selectedTarget: null,
                 prediction: cortexRes.predictedTrajectory,
                 intrinsicReward: cortexRes.intrinsicReward
@@ -2707,8 +2644,7 @@ class Agent {
             selectedTarget = visibleEnemies.find(e => e.id === this.mentalMap.targetPriority.id);
         }
         
-        if (!selectedTarget) {
-            const priorityTargets = allies.filter(a => 
+        if (!selectedTarget) {            const priorityTargets = allies.filter(a => 
                 a.mentalMap?.targetPriority && a._combatTimer > 0
             );
             if (priorityTargets.length >= 2) {
@@ -2742,7 +2678,8 @@ class Agent {
             });
             
             const countOnTarget = targetCount.get(selectedTarget.id) || 0;
-            if (countOnTarget >= 2) {                const freeTargets = visibleEnemies.filter(e => 
+            if (countOnTarget >= 2) {
+                const freeTargets = visibleEnemies.filter(e => 
                     !targetCount.has(e.id) || targetCount.get(e.id) < 2
                 );
                 if (freeTargets.length > 0) {
@@ -2756,8 +2693,7 @@ class Agent {
                     confidence: 1.0,
                     lastSeen: currentStep,
                     acquiredAt: this.mentalMap.targetPriority?.id === selectedTarget.id 
-                        ? this.mentalMap.targetPriority.acquiredAt 
-                        : currentStep
+                        ? this.mentalMap.targetPriority.acquiredAt                         : currentStep
                 };
             }
         }
@@ -2791,7 +2727,7 @@ class Agent {
                 const distToIntercept = w instanceof Wall ? w.distanceToPoint(enemyFutureX, enemyFutureY) : Math.hypot(enemyFutureX - w.x, enemyFutureY - w.y);
                 return distToIntercept < 44;
             });
-            if (hasWallIntercept) blendFactor = 0.2;            
+            if (hasWallIntercept) blendFactor = 0.2;
             let interceptX, interceptY;
             const rawInterceptX = selectedTarget.x * (1 - blendFactor) + enemyFutureX * blendFactor;
             const rawInterceptY = selectedTarget.y * (1 - blendFactor) + enemyFutureY * blendFactor;
@@ -2806,8 +2742,7 @@ class Agent {
                 interceptX = rawInterceptX;
                 interceptY = rawInterceptY;
             }
-            
-            const alliesOnTarget = allies.filter(a => 
+                        const alliesOnTarget = allies.filter(a => 
                 a.mentalMap?.targetPriority?.id === selectedTarget?.id && a._combatTimer > 0
             );
             if (alliesOnTarget.length > 0) {
@@ -2840,7 +2775,8 @@ class Agent {
             const trajectoryMod = D[9] * confidence * 0.3;
             
             behaviors.turn = Utils.clamp(
-                (angleError / Math.PI) + turnMod + trajectoryMod,                -1, 1
+                (angleError / Math.PI) + turnMod + trajectoryMod,
+                -1, 1
             );
             
             const angleToIntercept = Math.atan2(interceptY - this.y, interceptX - this.x);
@@ -2855,8 +2791,7 @@ class Agent {
                 : this.attackRange;
             const shouldAttack = inArc && dist < attackRangeWithHysteresis && this.attackCooldown <= 0;
             
-            if (shouldAttack !== this._wasAttackingLastFrame) {
-                if (!this._attackToggleTimer) this._attackToggleTimer = 0;
+            if (shouldAttack !== this._wasAttackingLastFrame) {                if (!this._attackToggleTimer) this._attackToggleTimer = 0;
                 this._attackToggleTimer++;
                 
                 if (this._attackToggleTimer < 5) {
@@ -2889,7 +2824,8 @@ class Agent {
         
         this.lastDecision = {
             mode: selectedTarget ? 'combat' : 'explore',
-            behaviors,            inputs,
+            behaviors,
+            inputs,
             output: D,
             selectedTarget,
             prediction: cortexRes.predictedTrajectory,
@@ -2904,8 +2840,7 @@ class Agent {
         const now = world?.step || 0;
         const deadTargets = [];
         
-        for (const entity of world?.enemies || []) {
-            if (!entity?.alive || entity.id === this.id || entity.team === this.team) continue;
+        for (const entity of world?.enemies || []) {            if (!entity?.alive || entity.id === this.id || entity.team === this.team) continue;
             
             const dx = entity.x - this.x;
             const dy = entity.y - this.y;
@@ -2938,7 +2873,8 @@ class Agent {
             value.confidence *= 0.98;
             if (value.confidence < 0.1 || now - value.lastSeen > 200) {
                 deadTargets.push(key);
-            }        });
+            }
+        });
         
         for (const key of deadTargets) {
             if (this.mentalMap.targetPriority?.id === key) {
@@ -2953,8 +2889,7 @@ class Agent {
 
     move(decision, walls, dt, otherAgents) {
         if (!isFinite(this.x) || !isFinite(this.y)) {
-            console.error(`Agent ${this.id} has invalid position`);
-            this.x = 425; this.y = 290;
+            console.error(`Agent ${this.id} has invalid position`);            this.x = 425; this.y = 290;
         }
         
         if (!isFinite(this.vx) || !isFinite(this.vy)) {
@@ -2987,7 +2922,7 @@ class Agent {
             const scale = arenaConfig.agentMaxVelocity / Math.sqrt(velSq);
             this.vx *= scale; this.vy *= scale;
         }
-                this.x += this.vx * dt;
+        this.x += this.vx * dt;
         this.y += this.vy * dt;
         
         // PATCH E.3: Wall collision with line segments
@@ -3003,8 +2938,7 @@ class Agent {
                 } else {
                     const push = Utils.normalize(this.x - wall.x, this.y - wall.y);
                     this.x += push.x * (minDist - dist);
-                    this.y += push.y * (minDist - dist);
-                }
+                    this.y += push.y * (minDist - dist);                }
                 this.vx *= 0.7; this.vy *= 0.7;
             }
         }
@@ -3036,7 +2970,8 @@ class Agent {
                     this.y -= ny * separation;
                     other.x += nx * separation;
                     other.y += ny * separation;
-                    const relVelX = this.vx - other.vx;                    const relVelY = this.vy - other.vy;
+                    const relVelX = this.vx - other.vx;
+                    const relVelY = this.vy - other.vy;
                     const relVelNormal = relVelX * nx + relVelY * ny;
                     if (relVelNormal < 0) {
                         const impulse = relVelNormal * arenaConfig.PHYSICS.COLLISION_ELASTICITY;
@@ -3052,8 +2987,7 @@ class Agent {
         const r = arenaConfig.agentCollisionRadius;
         this.x = Utils.clamp(this.x, r, 850 - r);
         this.y = Utils.clamp(this.y, r, 580 - r);
-        
-        if (!isFinite(this.x) || !isFinite(this.y)) {
+                if (!isFinite(this.x) || !isFinite(this.y)) {
             console.error(`Agent ${this.id} position overflow after move`);
             this.x = 425; this.y = 290;
         }
@@ -3085,7 +3019,8 @@ class Agent {
                 break;
             case 'heavy':
                 target._knockbackVelocity.x += knockbackDir.x * kbStrength * 1.8 / mass;
-                target._knockbackVelocity.y += knockbackDir.y * kbStrength * 1.8 / mass;                target._stunTimer = Math.max(target._stunTimer, weapon.stunTime);
+                target._knockbackVelocity.y += knockbackDir.y * kbStrength * 1.8 / mass;
+                target._stunTimer = Math.max(target._stunTimer, weapon.stunTime);
                 target._heavyHit = 20;
                 break;
             case 'slash':
@@ -3101,8 +3036,7 @@ class Agent {
                 target._pierced = 15;
                 target._stunTimer = Math.max(target._stunTimer, weapon.stunTime);
                 break;
-            case 'stagger':
-                target._knockbackVelocity.x += knockbackDir.x * kbStrength * 0.5 / mass;
+            case 'stagger':                target._knockbackVelocity.x += knockbackDir.x * kbStrength * 0.5 / mass;
                 target._knockbackVelocity.y += knockbackDir.y * kbStrength * 0.5 / mass;
                 target._knockbackVelocity.x += Utils.rand(-1, 1) * 2;
                 target._knockbackVelocity.y += Utils.rand(-1, 1) * 2;
@@ -3151,8 +3085,7 @@ class Agent {
             }
             if (Math.abs(decision.behaviors.turn) > 0.85 && moved < 0.3) {
                 reward -= arenaConfig.TACTICAL.SPINNING_PENALTY;
-            }
-            const allies = (world?.enemies || []).filter(a => 
+            }            const allies = (world?.enemies || []).filter(a => 
                 a?.alive && a.team === this.team && a.id !== this.id
             );
             if (allies.length > 0) {
@@ -3183,7 +3116,8 @@ class Agent {
                 reward -= 0.05;
             }
             
-            const allies = (world?.enemies || []).filter(a =>                 a?.alive && a.team === this.team && a.id !== this.id
+            const allies = (world?.enemies || []).filter(a => 
+                a?.alive && a.team === this.team && a.id !== this.id
             );
             const alliesOnTarget = allies.filter(a => 
                 a.mentalMap?.targetPriority?.id === decision.selectedTarget?.id
@@ -3200,8 +3134,7 @@ class Agent {
                 }
             }
         }
-        
-        const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
+                const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
         if (moved > 1.0) { reward += 0.01; this.stuckCounter = 0; }
         else { this.stuckCounter++; if (this.stuckCounter > 30) reward -= 0.05; }
         
@@ -3232,7 +3165,7 @@ class Agent {
         if (decision.intrinsicReward) {
             reward += decision.intrinsicReward;
         }
-                this.lastPos = { x: this.x, y: this.y };
+        this.lastPos = { x: this.x, y: this.y };
         reward = isFinite(reward) ? reward : 0;
         this.cumulativeReward = Utils.clamp(isFinite(this.cumulativeReward) ? this.cumulativeReward + reward : reward, -100, 500);
         
@@ -3250,8 +3183,7 @@ class Agent {
         if (reward > 4) this.updateMuscleMemory(decision.output, reward);
         this.learningBuffer.states.push(decision.inputs);
         this.learningBuffer.actions.push(decision.output);
-        this.learningBuffer.rewards.push(reward);
-        this.learningBuffer.values.push(currentValue);
+        this.learningBuffer.rewards.push(reward);        this.learningBuffer.values.push(currentValue);
         if (this.learningBuffer.states.length >= this.learningBuffer.maxBuffer) this._batchLearn();
     }
 
@@ -3301,7 +3233,6 @@ class Agent {
             }
         }
     }
-
     updatePredictiveMemory(world) {
         this.predictive.shortTerm.positions.push({ x: this.x, y: this.y });
         if (this.predictive.shortTerm.positions.length > 20) this.predictive.shortTerm.positions.shift();
@@ -3330,7 +3261,8 @@ class Agent {
         record.fights++;
         const enemyHealth = enemy.health / enemy.stats.maxHealth, myHealth = this.health / this.stats.maxHealth;
         if (enemyHealth < 0.3 && myHealth > 0.7) this.currentTactic = record.trust > 0 ? 'merciful' : 'aggressive';
-        else if (enemyHealth < 0.3 && myHealth < 0.3) this.currentTactic = Math.random() < 0.8 ? 'aggressive' : 'defensive';        else this.currentTactic = this.selectCombatTactic(distance, enemyHealth, myHealth, prediction);
+        else if (enemyHealth < 0.3 && myHealth < 0.3) this.currentTactic = Math.random() < 0.8 ? 'aggressive' : 'defensive';
+        else this.currentTactic = this.selectCombatTactic(distance, enemyHealth, myHealth, prediction);
         this.fightOpponent = enemy.id;
         this.fightStartTime = Date.now();
         return this.currentTactic;
@@ -3349,8 +3281,7 @@ class Agent {
         const chosen = statsMap.slice(0, 2);
         for (const pick of chosen) {
             this._applyStatBonus(pick.key, 1);
-        }
-        this.evolutionPoints = 0;
+        }        this.evolutionPoints = 0;
         Logger.log(`⬆️ ${this.id} улучшил: ${chosen.map(c=>c.key).join(', ')}`, 'success');
     }
 
@@ -3379,7 +3310,8 @@ class Agent {
     }
 
     getLearningMetrics() {
-        return {            avgTDError: this.net._stats?.tdErrorHistory?.reduce((a,b)=>a+b,0)/Math.max(1,this.net._stats?.tdErrorHistory?.length || 1) || 0,
+        return {
+            avgTDError: this.net._stats?.tdErrorHistory?.reduce((a,b)=>a+b,0)/Math.max(1,this.net._stats?.tdErrorHistory?.length || 1) || 0,
             avgPredictionError: this.net._computeAvgPredError?.() || 0,
             winRate: this.wins / Math.max(1, this.wins + this.deaths),
             avgDamage: this._totalDamageDealt / Math.max(1, this._totalAttacks),
@@ -3398,8 +3330,7 @@ class Agent {
                 row.forEach((v, i) => {
                     if (this.net._rng.next() < actualRate) {
                         row[i] += (this.net._rng.next() * 2 - 1) * 0.15;
-                        row[i] = Utils.clamp(row[i], -2, 2);
-                    }
+                        row[i] = Utils.clamp(row[i], -2, 2);                    }
                 });
             });
         }
@@ -3428,7 +3359,8 @@ class Agent {
         this.world = null;
         this.moveVector = { x: 0, y: 0 };
         this.moveSpeed = 1;
-        this.mentalMap = { enemies: new Map(), lastUpdate: 0, targetPriority: null };        this.assignedTargetId = null;
+        this.mentalMap = { enemies: new Map(), lastUpdate: 0, targetPriority: null };
+        this.assignedTargetId = null;
         this.assignedRole = 'assault';
         this.explorationTarget = null;
         this._combatTimer = 0;
@@ -3447,8 +3379,7 @@ class Agent {
         const inheritWeights = (child, parent) => {
             if (!child || !parent) return;
             for (let i = 0; i < Math.min(child.length, parent.length); i++) {
-                if (Array.isArray(child[i]) && Array.isArray(parent[i])) {
-                    for (let j = 0; j < Math.min(child[i].length, parent[i].length); j++) {
+                if (Array.isArray(child[i]) && Array.isArray(parent[i])) {                    for (let j = 0; j < Math.min(child[i].length, parent[i].length); j++) {
                         if (Math.random() < inheritRate) child[i][j] = parent[i][j];
                     }
                 }
@@ -3477,7 +3408,8 @@ class Agent {
             }
             ctx.stroke();
         }
-        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.facingAngle);        let drawColor = this.color;
+        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.facingAngle);
+        let drawColor = this.color;
         if (this._lastHitReceived > 0) drawColor = '#ff8888';
         else if (this.lastMutationType === 'dmg') drawColor = '#ff4444';
         else if (this.lastMutationType === 'spd') drawColor = '#4444ff';
@@ -3496,8 +3428,7 @@ class Agent {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(28, 0); ctx.stroke();
         ctx.restore();
         ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(`HP:${Math.round(this.stats.maxHealth)} DMG:${this.stats.damage}`, this.x, this.y - 32);
-        ctx.fillText(`${this.weapon.name} W:${this.wins}`, this.x, this.y - 22); ctx.textAlign = 'left';
+        ctx.fillText(`HP:${Math.round(this.stats.maxHealth)} DMG:${this.stats.damage}`, this.x, this.y - 32);        ctx.fillText(`${this.weapon.name} W:${this.wins}`, this.x, this.y - 22); ctx.textAlign = 'left';
         if (this.health < this.stats.maxHealth) {
             ctx.fillStyle = '#222'; ctx.fillRect(this.x - 22, this.y - 38, 44, 4);
             ctx.fillStyle = this.health > this.stats.maxHealth / 2 ? '#00ff9d' : '#ff5577';
@@ -3526,7 +3457,8 @@ class Agent {
                 this.y + Math.sin(this.facingAngle) * 40
             );
             ctx.stroke();
-                        if (this.lastDecision?.selectedTarget?.alive && this.predictedIntercept) {
+            
+            if (this.lastDecision?.selectedTarget?.alive && this.predictedIntercept) {
                 const target = this.lastDecision.selectedTarget;
                 const pred = this.predictedIntercept;
                 
@@ -3545,8 +3477,7 @@ class Agent {
                     ctx.strokeStyle = 'rgba(0, 255, 157, 0.7)';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([3, 3]);
-                    ctx.beginPath();
-                    ctx.moveTo(target.x, target.y);
+                    ctx.beginPath();                    ctx.moveTo(target.x, target.y);
                     ctx.lineTo(pred.futureX, pred.futureY);
                     ctx.stroke();
                     ctx.setLineDash([]);
@@ -3575,7 +3506,8 @@ class Agent {
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.arc(0, 0, this.attackRange, -this.weapon.arcAngle/2, this.weapon.arcAngle/2);
-            ctx.closePath();            ctx.fill();
+            ctx.closePath();
+            ctx.fill();
             
             ctx.strokeStyle = this.lastDecision?.inWeaponArc ? 'rgba(255, 0, 0, 0.8)' : 'rgba(255, 170, 0, 0.5)';
             ctx.lineWidth = 2;
@@ -3594,8 +3526,7 @@ class Agent {
                 ctx.stroke();
                 
                 ctx.fillStyle = '#ff0';
-                ctx.font = 'bold 12px monospace';
-                ctx.textAlign = 'center';
+                ctx.font = 'bold 12px monospace';                ctx.textAlign = 'center';
                 ctx.fillText('⚔️ ATTACK', this.x, this.y - 35);
             }
         }
@@ -3624,7 +3555,8 @@ class Agent {
             ctx.beginPath(); ctx.arc(this.x, this.y, arenaConfig.agentCollisionRadius, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
         }
         if (window.arenaGame?.debug) {
-            ctx.strokeStyle = 'rgba(0, 255, 100, 0.6)'; ctx.lineWidth = 1.5; ctx.beginPath();            ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.velocity.x * 4, this.y + this.velocity.y * 4); ctx.stroke();
+            ctx.strokeStyle = 'rgba(0, 255, 100, 0.6)'; ctx.lineWidth = 1.5; ctx.beginPath();
+            ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.velocity.x * 4, this.y + this.velocity.y * 4); ctx.stroke();
         }
         if (window.arenaGame?.debug) {
             ctx.fillStyle = this._exposure.type === 'back' ? '#ff0000' : (this._exposure.type === 'flank' ? '#ffaa00' : '#00ff9d');
@@ -3643,8 +3575,7 @@ class Agent {
             ctx.beginPath();
             ctx.arc(0, 0, 18 * pulse, 0, Math.PI * 2);
             ctx.fill();
-            
-            ctx.fillStyle = '#ff4444';
+                        ctx.fillStyle = '#ff4444';
             ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -3673,7 +3604,8 @@ class Agent {
         const enemiesNearby = inputs[2] < 0.5;
         return {
             mode: enemiesNearby ? '🔥 БОЙ' : '🔍 РАЗВЕДКА',
-            weapon: this.weapon.icon + ' ' + this.weapon.name,            target: `${Math.round(this.target.x)},${Math.round(this.target.y)}`,
+            weapon: this.weapon.icon + ' ' + this.weapon.name,
+            target: `${Math.round(this.target.x)},${Math.round(this.target.y)}`,
             speed: Math.hypot(this.velocity.x, this.velocity.y).toFixed(2),
             D0_forward: D[0]?.toFixed(2) || '—',
             D1_turn: D[1]?.toFixed(2) || '—',
@@ -3692,8 +3624,7 @@ class Agent {
             threat: attention.threat, flank: attention.flank, memoryConf: attention.prediction,
             reflexActive: this.net.S?.some?.(v => v > 0.8) ? 'YES' : 'NO',
             cortexEnergy: this.net.C ? (this.net.C.reduce((s,v) => s + Math.abs(v), 0) / this.net.DIM.DIM_C).toFixed(3) : '—',
-            enemyIntent: enemyIntent.intent, intentConf: enemyIntent.confidence.toFixed(2),
-            facing: (this.facingAngle * 180 / Math.PI).toFixed(0) + '°',
+            enemyIntent: enemyIntent.intent, intentConf: enemyIntent.confidence.toFixed(2),            facing: (this.facingAngle * 180 / Math.PI).toFixed(0) + '°',
             visitedCells: this.permanent.memory.visited.size,
             mentalMapEnemies: this.mentalMap.enemies.size,
             priorityTarget: this.mentalMap.targetPriority ? `${this.mentalMap.targetPriority.id?.substring(0,8)}...` : 'none',
@@ -3702,7 +3633,7 @@ class Agent {
             predError60: this.net.predictionError60?.toFixed(1) || '—',
             intercept: this.predictedIntercept ? 
                 `x:${this.predictedIntercept.x.toFixed(0)},y:${this.predictedIntercept.y.toFixed(0)}` : '—',
-            maze: this.world?._mazeConfig ? `${this.world._mazeConfig.type}(${this.world._mazeConfig.complexity?.toFixed(2) || '—'})` : '—',
+            walls: this.world?._wallConfig ? `${this.world._wallConfig.count} walls` : '—',
             coverDist: this._wallDistance < 50 ? 'NEAR' : (this._wallDistance < 100 ? 'MED' : 'FAR')
         };
     }
@@ -3722,7 +3653,8 @@ class Agent {
                 visited: new Set(this.permanent.memory.visited),
                 unvisited: this.permanent.memory.unvisited.map(p => ({ ...p }))
             }
-        };        agent.predictive = {
+        };
+        agent.predictive = {
             shortTerm: { positions: [], actions: [], results: [], enemyHistory: [], foodHistory: [] },
             patterns: { enemyMovement: null, foodSpawn: null, dangerZones: new Map() },
             predictions: { enemyPos: { x: 0, y: 0 }, foodPos: { x: 0, y: 0 }, collision: false, success: 0.5 },
@@ -3741,8 +3673,7 @@ class Agent {
         agent._continuousKB = this._continuousKB; agent._forcedCombatTimer = this._forcedCombatTimer;
         agent._learnFromWinner = this._learnFromWinner; agent._lastKiller = this._lastKiller;
         agent._deathMode = this._deathMode; agent._lastAttackDir = this._lastAttackDir;
-        agent._recentArcExposure = this._recentArcExposure ? [...this._recentArcExposure] : [];
-        agent._inEnemyArc = this._inEnemyArc;
+        agent._recentArcExposure = this._recentArcExposure ? [...this._recentArcExposure] : [];        agent._inEnemyArc = this._inEnemyArc;
         agent._lastThreatAssessment = this._lastThreatAssessment ? { ...this._lastThreatAssessment } : null;
         agent._totalDamageDealt = this._totalDamageDealt; agent._totalAttacks = this._totalAttacks;
         agent._successfulHits = this._successfulHits; agent._tacticalHits = this._tacticalHits;
@@ -3771,7 +3702,8 @@ class Agent {
 
     toJSON() {
         return {
-            id: this.id, seed: this.seed, x: this.x, y: this.y, team: this.team, health: this.health, stats: this.stats,            lastMutationType: this.lastMutationType, cumulativeReward: this.cumulativeReward,
+            id: this.id, seed: this.seed, x: this.x, y: this.y, team: this.team, health: this.health, stats: this.stats,
+            lastMutationType: this.lastMutationType, cumulativeReward: this.cumulativeReward,
             wins: this.wins, totalKills: this.totalKills, deaths: this.deaths, mutations: this.mutations,
             generation: this.generation, weaponType: this.weaponType, net: this.net.toJSON(),
             critic: this.critic.toJSON(), policySelector: this.policySelector.toJSON(),
@@ -3790,8 +3722,7 @@ class Agent {
             trainingStats: this.net._stats,
             socialMemory: {
                 interactions: Array.from(this.socialMemory.interactions.entries()).map(([k, v]) => [k, { ...v }]),
-                reputation: this.socialMemory.reputation, lastAggressor: this.socialMemory.lastAggressor,
-                allies: [...this.socialMemory.allies], killerHistory: this.socialMemory.killerHistory
+                reputation: this.socialMemory.reputation, lastAggressor: this.socialMemory.lastAggressor,                allies: [...this.socialMemory.allies], killerHistory: this.socialMemory.killerHistory
             },
             evolutionPoints: this.evolutionPoints, statChoices: [...this.statChoices],
             _lastHitDealt: this._lastHitDealt, _knockbackVelocity: this._knockbackVelocity,
@@ -3820,7 +3751,8 @@ class Agent {
             predictedIntercept: this.predictedIntercept,
             _moveAngle: this._moveAngle,
             _wasAttackingLastFrame: this._wasAttackingLastFrame,
-            _attackToggleTimer: this._attackToggleTimer,            _targetDeathFrame: this._targetDeathFrame,
+            _attackToggleTimer: this._attackToggleTimer,
+            _targetDeathFrame: this._targetDeathFrame,
             _targetSwitchFrame: this._targetSwitchFrame
         };
     }
@@ -3839,8 +3771,7 @@ class Agent {
         agent.deaths = data.deaths ?? 0; agent.mutations = data.mutations ?? 0;
         agent.generation = data.generation ?? 1;
         if (data.permanent) {
-            agent.permanent.skills = { ...(data.permanent.skills || agent.permanent.skills) };
-            agent.permanent.strategies = { ...(data.permanent.strategies || agent.permanent.strategies) };
+            agent.permanent.skills = { ...(data.permanent.skills || agent.permanent.skills) };            agent.permanent.strategies = { ...(data.permanent.strategies || agent.permanent.strategies) };
             agent.permanent.preferences = { ...(data.permanent.preferences || agent.permanent.preferences) };
             if (data.permanent.muscleMemory) agent.permanent.muscleMemory = new Float32Array(data.permanent.muscleMemory);
             if (data.permanent.memory) {
@@ -3869,7 +3800,8 @@ class Agent {
         }
         if (data.evolutionPoints !== undefined) agent.evolutionPoints = data.evolutionPoints;
         if (data.statChoices) agent.statChoices = [...data.statChoices];
-        if (data._lastHitDealt !== undefined) agent._lastHitDealt = data._lastHitDealt;        if (data._knockbackVelocity) agent._knockbackVelocity = { ...data._knockbackVelocity };
+        if (data._lastHitDealt !== undefined) agent._lastHitDealt = data._lastHitDealt;
+        if (data._knockbackVelocity) agent._knockbackVelocity = { ...data._knockbackVelocity };
         if (data._stunTimer !== undefined) agent._stunTimer = data._stunTimer;
         if (data._forcedCombatTimer !== undefined) agent._forcedCombatTimer = data._forcedCombatTimer;
         if (data._learnFromWinner !== undefined) agent._learnFromWinner = data._learnFromWinner;
@@ -3888,8 +3820,7 @@ class Agent {
         if (data.velocity) agent.velocity = { ...data.velocity };
         if (data._angleToEnemy !== undefined) agent._angleToEnemy = data._angleToEnemy;
         if (data._wallDistance !== undefined) agent._wallDistance = data._wallDistance;
-        if (data._isFacingEnemy !== undefined) agent._isFacingEnemy = data._isFacingEnemy;
-        if (data._attackValid !== undefined) agent._attackValid = data._attackValid;
+        if (data._isFacingEnemy !== undefined) agent._isFacingEnemy = data._isFacingEnemy;        if (data._attackValid !== undefined) agent._attackValid = data._attackValid;
         if (data._exposure) agent._exposure = { ...data._exposure };
         if (data._inCombatRange !== undefined) agent._inCombatRange = data._inCombatRange;
         if (data.decisionCommitment) agent.decisionCommitment = Utils.deepClone(data.decisionCommitment);
@@ -3918,7 +3849,8 @@ class Agent {
 // ============================================================================
 
 class World {
-    constructor(width, height) {        this.logicalWidth = width;
+    constructor(width, height) {
+        this.logicalWidth = width;
         this.logicalHeight = height;
         this.step = 0;
         this.episode = 0;
@@ -3929,46 +3861,28 @@ class World {
         this.healthPacks = [];
         this._nextPackSpawn = 600;
         this._packSpawnInterval = 600;
-        this._mazeGrid = null;
-        this._mazeConfig = null;
+        this._wallConfig = null;
         this._validatedSpawns = null;
     }
 
-    reset(mazeSeed = null) {
+    reset(wallSeed = null) {
         this.step = 0;
         
-        const mazeConfig = {
-            width: this.logicalWidth,
-            height: this.logicalHeight,
-            cellSize: arenaConfig.mazeCellSize || 60,
-            complexity: Utils.rand(arenaConfig.mazeComplexityRange[0], arenaConfig.mazeComplexityRange[1]),
-            seed: mazeSeed || arenaConfig.seed + '_EP' + this.episode
+        const wallConfig = {
+            count: arenaConfig.wallCount || 3,            length: arenaConfig.wallLength || 120,
+            seed: wallSeed || arenaConfig.seed + '_EP' + this.episode
         };
         
-        if (arenaConfig.enableMazeGeneration !== false) {
-            const mazeType = document.getElementById('mazeTypeSelect')?.value || 'random';
-            let maze;
-            if (mazeType === 'labyrinth' || (mazeType === 'random' && Utils.rand(0,1) < 0.7)) {
-                maze = MazeGenerator.generateMaze(
-                    mazeConfig.width, 
-                    mazeConfig.height, 
-                    mazeConfig.cellSize, 
-                    mazeConfig.complexity,
-                    mazeConfig.seed
-                );
-                this.walls = maze.walls;
-                this._mazeGrid = maze.grid;
-                this._mazeConfig = { type: 'labyrinth', ...mazeConfig };
-            } else {
-                const cover = MazeGenerator.generateCoverClusters(
-                    mazeConfig.width,
-                    mazeConfig.height,
-                    Utils.randInt(3, 6),
-                    mazeConfig.seed + '_COVER'
-                );
-                this.walls = cover.walls;
-                this._mazeGrid = null;                this._mazeConfig = { type: 'clusters', ...mazeConfig };
-            }
+        if (arenaConfig.enableWalls !== false) {
+            const wallGen = WallGenerator.generateRandomWalls(
+                this.logicalWidth,
+                this.logicalHeight,
+                wallConfig.count,
+                wallConfig.length,
+                wallConfig.seed
+            );
+            this.walls = wallGen.walls;
+            this._wallConfig = wallConfig;
             
             const spawnPoints = {
                 blue: [{x:120,y:180}, {x:120,y:400}, {x:180,y:290}, {x:220,y:220}],
@@ -3991,32 +3905,28 @@ class World {
             }
             this._validatedSpawns = spawnPoints;
         } else {
-            const margin = 70;
-            const maxX = this.logicalWidth - margin;
-            const maxY = this.logicalHeight - margin;
-            this.walls = [];
-            for (let i = 0; i < 12; i++) {
-                this.walls.push({ 
-                    x: margin + Utils.rand(0, maxX - margin), 
-                    y: margin + Utils.rand(0, maxY - margin) 
-                });
-            }
-            this._mazeConfig = { type: 'simple', ...mazeConfig };
+            this.walls = [
+                new Wall(0, 0, this.logicalWidth, 0, 'border'),
+                new Wall(this.logicalWidth, 0, this.logicalWidth, this.logicalHeight, 'border'),
+                new Wall(this.logicalWidth, this.logicalHeight, 0, this.logicalHeight, 'border'),
+                new Wall(0, this.logicalHeight, 0, 0, 'border')
+            ];
+            this._wallConfig = { count: 0, length: 0, ...wallConfig };
             this._validatedSpawns = {
                 blue: [{x:120,y:180}, {x:120,y:400}, {x:180,y:290}, {x:220,y:220}, {x:220,y:360}, {x:170,y:260}, {x:170,y:320}, {x:140,y:290}],
                 red:  [{x:730,y:180}, {x:730,y:400}, {x:670,y:290}, {x:630,y:220}, {x:630,y:360}, {x:680,y:260}, {x:680,y:320}, {x:710,y:290}]
             };
         }
         
-        this.projectiles = [];
-        this.healthPacks = [];
+        this.projectiles = [];        this.healthPacks = [];
         this._nextPackSpawn = 600;
         
-        Logger.log(`🌀 Maze generated: ${this._mazeConfig.type} (complexity: ${mazeConfig.complexity.toFixed(2)})`, 'info');
+        Logger.log(`🧱 Walls generated: ${this._wallConfig.count} walls (length: ~${this._wallConfig.length}px)`, 'info');
     }
 
     _spawnHealthPack() {
-        const margin = 50;        const maxAttempts = 50;
+        const margin = 50;
+        const maxAttempts = 50;
         
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const x = margin + Utils.rand(0, this.logicalWidth - margin * 2);
@@ -4057,15 +3967,15 @@ class World {
             for (let i = 0; i < countPerTeam; i++) {
                 const uniqueSeed = `${arenaConfig.seed}_${team.toUpperCase()}_A${i}_${agentId}`;
                 const pos = spawnPoints[team][i % spawnPoints[team].length];
-                const agent = new Agent(
-                    `${team}_${i}`,
+                const agent = new Agent(                    `${team}_${i}`,
                     pos.x + Utils.rand(-20, 20),
                     pos.y + Utils.rand(-20, 20),
                     colors[team],
                     uniqueSeed,
                     weapons[team],
                     team
-                );                this.enemies.push(agent);
+                );
+                this.enemies.push(agent);
                 agentId++;
             }
         }
@@ -4106,15 +4016,15 @@ class World {
                 const enemy = enemies[0], distance = Utils.dist(agent, enemy);
                 if (distance < 150) {
                     agent.enemyPredictor.recordMove(agent.lastDecision?.behaviors || {}, distance, enemy.health / enemy.stats.maxHealth, agent.lastDecision?.behaviors?.aggression || 0.5);
-                    if (distance < 100) agent.decideCombatAction(enemy, this);
-                }
+                    if (distance < 100) agent.decideCombatAction(enemy, this);                }
             }
             const decision = agent.decide(this);
             agent.move(decision, this.walls, dt, aliveAgents);
             agent.attackCooldown = Math.max(0, (agent.attackCooldown || 0) - 1);
             
             if (arenaConfig.enableFighting) {
-                const opponents = this.enemies.filter(e => e && e.id !== agent.id && e.alive && e.team !== agent.team);                if (opponents.length > 0) {
+                const opponents = this.enemies.filter(e => e && e.id !== agent.id && e.alive && e.team !== agent.team);
+                if (opponents.length > 0) {
                     const sortedOpponents = opponents.sort((a, b) => Utils.dist(agent, a) - Utils.dist(agent, b));
                     const enemy = sortedOpponents[0];
                     const dist = Utils.dist(agent, enemy);
@@ -4155,15 +4065,15 @@ class World {
                                 agent._combatEvents.push({ type: 'enemy_defeated', target: enemy.id });
                                 enemy._combatEvents.push({ type: 'killed_by', killer: agent.id });
                             }
-                        }
-                    } else if (arenaConfig.enableRanged && (agent.attackCooldown || 0) <= 0) {
+                        }                    } else if (arenaConfig.enableRanged && (agent.attackCooldown || 0) <= 0) {
                         if (agent.weapon.type === 'ranged') {
                             const aggr = agent.lastDecision?.behaviors?.aggression || 0.4;
                             if (aggr > 0.3 && dist > range && dist <= 200) {
                                 const dir = Utils.normalize(enemy.x - agent.x, enemy.y - agent.y);
                                 const speed = 10 + Math.random() * 4;
                                 const dmg = Math.floor(Utils.clamp(agent.stats.damage * 0.5 * (0.8 + aggr * 0.8), 1, 5));
-                                const p = new Projectile(agent.x + dir.x * 12, agent.y + dir.y * 12, dir.x * speed, dir.y * speed, agent.id, dmg, 80);                                this.projectiles.push(p);
+                                const p = new Projectile(agent.x + dir.x * 12, agent.y + dir.y * 12, dir.x * speed, dir.y * speed, agent.id, dmg, 80);
+                                this.projectiles.push(p);
                                 agent.attackCooldown = agent.stats.fireRate + 5;
                                 attacked = true;
                             }
@@ -4204,15 +4114,15 @@ class World {
                 this.healthPacks = this.healthPacks.filter(p => !p.collected && p.lifetime > 0);
             }
         }
-        
-        for (const p of this.projectiles) {
+                for (const p of this.projectiles) {
             if (!p?.alive) continue;
             p.update(dt);
             for (const w of this.walls) {
                 const dist = w instanceof Wall ? w.distanceToPoint(p.x, p.y) : Utils.dist(p, w);
                 if (dist < 14 + p.radius) { p.alive = false; break; }
             }
-            if (!p.alive) continue;            for (const e of this.enemies) {
+            if (!p.alive) continue;
+            for (const e of this.enemies) {
                 if (!e || !e.alive || e.id === p.owner) continue;
                 if (Utils.dist(p, e) < 15) {
                     const dodgeRoll = Math.random();
@@ -4253,15 +4163,15 @@ class World {
         if (winner !== 'draw') {
             const winners = this.enemies.filter(a => a.team === winner);
             for (const agent of winners) {
-                agent.wins++;
-                agent.evolutionPoints = 2;
+                agent.wins++;                agent.evolutionPoints = 2;
                 agent.applyEvolutionPoints();
                 agent.cumulativeReward += arenaConfig.EVOLUTION.WIN_BONUS;
                 agent.net.updateDiagnostics({ kill: true });
                 Logger.log(`🏆 ${agent.id.toUpperCase()} Gen${agent.generation} wins! Total Wins: ${agent.wins}`, 'success');
             }
         }
-        const losers = this.enemies.filter(a => a.team !== winner);        for (const agent of losers) {
+        const losers = this.enemies.filter(a => a.team !== winner);
+        for (const agent of losers) {
             agent.deaths++;
             agent._lastKiller = winner === 'blue' ? 'red_team' : 'blue_team';
             agent.net.updateDiagnostics({ death: true });
@@ -4302,15 +4212,14 @@ class World {
                 ctx.fill();
                 ctx.strokeStyle = '#6a6a9a';
                 ctx.lineWidth = 2;
-                ctx.stroke();
-            }
+                ctx.stroke();            }
         }
         
         for (const pr of this.projectiles || []) if (pr) pr.draw(ctx);
         
         for (const pack of this.healthPacks) {
             if (!pack.collected) pack.draw(ctx);
-        }        
+        }
         for (const a of this.enemies) if (a) a.draw(ctx, vision, trail);
         ctx.fillStyle = 'rgba(100,100,140,0.5)'; ctx.font = '10px monospace';
         ctx.fillText(`Step: ${this.step} | Ep: ${this.episode} | Fights: ${this.totalFights}`, 12, this.logicalHeight - 12);
@@ -4352,8 +4261,7 @@ class GameEngine {
         this.logicalHeight = arenaConfig.ARCH.LOGICAL_HEIGHT;
         this.resize();
         this.world = new World(this.logicalWidth, this.logicalHeight);
-        this.running = false; this.lastTime = 0; this.fps = 60;
-        this.vision = false; this.debug = false; this.showMetrics = true;
+        this.running = false; this.lastTime = 0; this.fps = 60;        this.vision = false; this.debug = false; this.showMetrics = true;
         this.showMazeGrid = false;
         this.selectedAgent = null; this.rafId = null;
         this._onResize = this._onResize.bind(this);
@@ -4400,7 +4308,7 @@ class GameEngine {
         document.getElementById('btnVision').onclick = () => { this.vision = !this.vision; this.updateBtns(); };
         document.getElementById('btnApplyWeapons').onclick = () => this.applyWeapons();
         document.getElementById('btnRandomWeapons').onclick = () => this.randomWeapons();
-        document.getElementById('btnRegenerateMaze').onclick = () => this.regenerateMaze();
+        document.getElementById('btnRegenerateWalls').onclick = () => this.regenerateWalls();
         document.getElementById('btnShowGrid').onclick = function() {
             this.classList.toggle('active');
             window.arenaGame.showMazeGrid = this.classList.contains('active');
@@ -4420,7 +4328,8 @@ class GameEngine {
                     try { callback.call(this, value); } catch (err) { console.error(err); }
                 }
             };
-        };        
+        };
+        
         bindSlider('learningRate', 'learningRate', 'learningRateValue', (v) => {
             if (this.world?.enemies) this.world.enemies.forEach(a => { if (a?.net) a.net.lr = v; });
         });
@@ -4433,8 +4342,11 @@ class GameEngine {
         });
         bindSlider('agentCount', 'agentCount', 'agentCountValue');
         bindSlider('viewRadius', 'viewRadius', 'viewRadiusValue');
-        bindSlider('mazeComplexity', 'mazeComplexityRange', 'mazeComplexityValue', (v) => {
-            arenaConfig.mazeComplexityRange = [v - 0.1, v + 0.1];
+        bindSlider('wallCount', 'wallCount', 'wallCountValue', (v) => {
+            arenaConfig.wallCount = Math.floor(v);
+        });
+        bindSlider('wallLength', 'wallLength', 'wallLengthValue', (v) => {
+            arenaConfig.wallLength = Math.floor(v);
         });
         
         const bindToggle = (id, configKey) => {
@@ -4442,8 +4354,7 @@ class GameEngine {
             if (toggle) {
                 toggle.onchange = (e) => { arenaConfig[configKey] = e.target.checked; };
             }
-        };
-        
+        };        
         bindToggle('enableTraining', 'enableTraining');
         bindToggle('enableEvolution', 'enableEvolution');
         bindToggle('enableFighting', 'enableFighting');
@@ -4454,7 +4365,7 @@ class GameEngine {
         bindToggle('enableConsolidation', 'enableConsolidation');
         bindToggle('enableHealthPacks', 'enableHealthPacks');
         bindToggle('enableLowHealthHint', 'enableLowHealthHint');
-        bindToggle('enableMazeGeneration', 'enableMazeGeneration');
+        bindToggle('enableWalls', 'enableWalls');
     }
 
     _onKey(e) {
@@ -4465,11 +4376,12 @@ class GameEngine {
             case '2': this.selectedAgent = this.world?.enemies?.[1]; this.updateDebugPanel(); break;
             case 'Tab': e.preventDefault(); const focusable = document.querySelectorAll('button, input, [tabindex="0"]'), idx = Array.from(focusable).indexOf(document.activeElement); focusable[(idx + 1) % focusable.length]?.focus(); break;
             case 'Escape': if (this.debug) { this.debug = false; this.updateDebugPanel(); } break;
-            case 'm': if (this.debug) this.regenerateMaze(); break;
+            case 'w': if (this.debug) this.regenerateWalls(); break;
             case 'h': arenaConfig.enableHealthPacks = !arenaConfig.enableHealthPacks; Logger.log(`🧪 Health packs: ${arenaConfig.enableHealthPacks ? 'ON' : 'OFF'}`, 'info'); break;
             case 'v': this.vision = !this.vision; this.updateBtns(); break;
         }
     }
+    
     _onClick({ x, y }) {
         if (!this.debug) return;
         const lx = x / (this.canvas.width / this.logicalWidth), ly = y / (this.canvas.height / this.logicalHeight);
@@ -4491,9 +4403,8 @@ class GameEngine {
         const redWeapon = document.getElementById('redWeaponSelect').value;
         this.world.spawnAgents(count, blueWeapon, redWeapon);
         this.updateAgentList();
-        this.updateStats();
-        Logger.log('🚀 AI Arena v6.0.8 Professional initialized', 'success');
-        Logger.log(`📐 Map: ${this.logicalWidth}×${this.logicalHeight} | Maze: ${this.world._mazeConfig?.type || 'simple'}`, 'info');
+        this.updateStats();        Logger.log('🚀 AI Arena v6.0.9 Professional initialized', 'success');
+        Logger.log(`📐 Map: ${this.logicalWidth}×${this.logicalHeight} | Walls: ${this.world._wallConfig?.count || 0}`, 'info');
     }
 
     toggle() {
@@ -4518,7 +4429,8 @@ class GameEngine {
         this.updateStats();
         Logger.log('🔄 Reset', 'warn');
     }
-    regenerateMaze() {
+    
+    regenerateWalls() {
         if (this.world) {
             const seed = arenaConfig.seed + '_MANUAL_' + Date.now();
             this.world.reset(seed);
@@ -4526,7 +4438,7 @@ class GameEngine {
             const blueWeapon = document.getElementById('blueWeaponSelect').value;
             const redWeapon = document.getElementById('redWeaponSelect').value;
             this.world.spawnAgents(count, blueWeapon, redWeapon);
-            Logger.log('🌀 Maze regenerated', 'info');
+            Logger.log(`🧱 Walls regenerated: ${arenaConfig.wallCount} walls`, 'info');
             this.updateStats();
         }
     }
@@ -4540,8 +4452,7 @@ class GameEngine {
         this.fps = Math.round(1000 / (deltaTime + 0.001));
         this.lastTime = now;
         document.getElementById('fpsCounter').textContent = `FPS: ${this.fps}`;
-        this.world.update(dt);
-        this.world.draw(this.ctx, this.vision);
+        this.world.update(dt);        this.world.draw(this.ctx, this.vision);
         this.updateStats();
         this.updateMetrics();
         this.updateAgentList();
@@ -4567,11 +4478,12 @@ class GameEngine {
         `).join('');
     }
 
-    updateStats(state = null) {        if (!state) state = { episode: this.world.episode, totalFights: this.world.totalFights };
+    updateStats(state = null) {
+        if (!state) state = { episode: this.world.episode, totalFights: this.world.totalFights };
         document.getElementById('episodeStat').textContent = state.episode;
         document.getElementById('stepStat').textContent = this.world.step;
         document.getElementById('totalFightsStat').textContent = state.totalFights;
-        document.getElementById('obstaclesStat').textContent = this.world.walls.length;
+        document.getElementById('obstaclesStat').textContent = this.world.walls.filter(w => w instanceof Wall && w.type !== 'border').length;
         document.getElementById('episodeProgress').style.width = `${(state.episode % 10) * 10}%`;
     }
 
@@ -4589,8 +4501,7 @@ class GameEngine {
         document.getElementById('metricAccuracy').textContent = avgAcc.toFixed(2);
     }
 
-    updateLowHealthHint() {
-        const hintPanel = document.getElementById('lowHealthHint');
+    updateLowHealthHint() {        const hintPanel = document.getElementById('lowHealthHint');
         if (hintPanel && arenaConfig.enableLowHealthHint) {
             const anyLowHealth = this.world?.enemies?.some(a => 
                 a?.alive && a.health < a.stats.maxHealth * 0.5
@@ -4617,28 +4528,29 @@ class GameEngine {
     updateBtns() {
         document.getElementById('btnVision').classList.toggle('active', this.vision);
     }
+    
     save() {
         const data = { 
-            version: '6.0.8-PROFESSIONAL', 
+            version: '6.0.9-PROFESSIONAL', 
             timestamp: Date.now(), 
             config: { 
                 agentCount: document.getElementById('agentCount').value, 
                 learningRate: arenaConfig.learningRate, 
                 agentSpeed: arenaConfig.agentSpeed, 
                 viewRadius: arenaConfig.viewRadius,
-                mazeComplexityRange: arenaConfig.mazeComplexityRange
+                wallCount: arenaConfig.wallCount,
+                wallLength: arenaConfig.wallLength
             }, 
             world: { 
                 episode: this.world.episode, 
                 step: this.world.step, 
                 totalFights: this.world.totalFights, 
                 walls: this.world.walls.map(w => w instanceof Wall ? w.toJSON() : w),
-                mazeConfig: this.world._mazeConfig,
+                wallConfig: this.world._wallConfig,
                 validatedSpawns: this.world._validatedSpawns
             }, 
             agents: this.world.enemies.map(a => a.toJSON()),
-            healthPacks: this.world.healthPacks.map(p => p.toJSON())
-        };
+            healthPacks: this.world.healthPacks.map(p => p.toJSON())        };
         localStorage.setItem('aiArenaV6Pro', JSON.stringify(data));
         Logger.log('💾 Saved', 'success');
     }
@@ -4651,41 +4563,43 @@ class GameEngine {
         arenaConfig.learningRate = data.config?.learningRate || 0.015;
         arenaConfig.agentSpeed = data.config?.agentSpeed || 10;
         arenaConfig.viewRadius = data.config?.viewRadius || 250;
-        arenaConfig.mazeComplexityRange = data.config?.mazeComplexityRange || [0.6, 0.85];
+        arenaConfig.wallCount = data.config?.wallCount || 3;
+        arenaConfig.wallLength = data.config?.wallLength || 120;
         document.getElementById('learningRateValue').textContent = arenaConfig.learningRate.toFixed(3);
         document.getElementById('agentSpeedValue').textContent = arenaConfig.agentSpeed.toFixed(0);
         document.getElementById('viewRadiusValue').textContent = arenaConfig.viewRadius.toFixed(0);
-        document.getElementById('mazeComplexityValue').textContent = ((arenaConfig.mazeComplexityRange[0] + arenaConfig.mazeComplexityRange[1]) / 2).toFixed(2);
+        document.getElementById('wallCountValue').textContent = arenaConfig.wallCount;
+        document.getElementById('wallLengthValue').textContent = arenaConfig.wallLength;
         this.world.episode = data.world?.episode || 0;
         this.world.step = data.world?.step || 0;
         this.world.totalFights = data.world?.totalFights || 0;
         this.world.walls = (data.world?.walls || []).map(w => Wall.fromJSON(w));
-        this.world._mazeConfig = data.world?.mazeConfig || null;
+        this.world._wallConfig = data.world?.wallConfig || null;
         this.world._validatedSpawns = data.world?.validatedSpawns || null;
         this.world.enemies = data.agents?.map((a, i) => Agent.fromJSON(a, i < data.agents.length/2 ? '#00d4ff' : '#ff5577')) || [];
         if (data.healthPacks) {
             this.world.healthPacks = data.healthPacks.map(p => HealthPack.fromJSON(p));
-        }        this.updateAgentList();
+        }
+        this.updateAgentList();
         this.updateStats();
         Logger.log('📂 Loaded', 'success');
     }
 
     exportWeights() {
         const data = { 
-            version: '6.0.8-PROFESSIONAL', 
+            version: '6.0.9-PROFESSIONAL', 
             timestamp: Date.now(), 
             config: arenaConfig,
             agents: this.world.enemies.map(a => a.toJSON()),
             world: {
                 walls: this.world.walls.map(w => w instanceof Wall ? w.toJSON() : w),
-                mazeConfig: this.world._mazeConfig,
+                wallConfig: this.world._wallConfig,
                 validatedSpawns: this.world._validatedSpawns
             }
         };
         const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `arena-v6-pro-${Date.now()}.json`; a.click();
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = `arena-v6-pro-${Date.now()}.json`; a.click();        URL.revokeObjectURL(url);
         Logger.log('📤 Exported', 'success');
     }
 
@@ -4695,11 +4609,11 @@ class GameEngine {
         reader.onload = (ev) => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if (data.version !== '6.0.8-PROFESSIONAL') throw new Error('Wrong version');
+                if (data.version !== '6.0.9-PROFESSIONAL') throw new Error('Wrong version');
                 this.world.enemies = data.agents.map((a, i) => Agent.fromJSON(a, i < data.agents.length/2 ? '#00d4ff' : '#ff5577'));
                 if (data.world) {
                     this.world.walls = (data.world.walls || []).map(w => Wall.fromJSON(w));
-                    this.world._mazeConfig = data.world.mazeConfig || null;
+                    this.world._wallConfig = data.world.wallConfig || null;
                     this.world._validatedSpawns = data.world.validatedSpawns || null;
                 }
                 this.updateAgentList();
@@ -4714,7 +4628,8 @@ class GameEngine {
         const blueWeapon = document.getElementById('blueWeaponSelect').value;
         const redWeapon = document.getElementById('redWeaponSelect').value;
         this.world.enemies.filter(a => a.team === 'blue').forEach(a => a.setWeapon(blueWeapon));
-        this.world.enemies.filter(a => a.team === 'red').forEach(a => a.setWeapon(redWeapon));        this.updateAgentList();
+        this.world.enemies.filter(a => a.team === 'red').forEach(a => a.setWeapon(redWeapon));
+        this.updateAgentList();
         Logger.log('✅ Weapons applied', 'success');
     }
 
@@ -4733,8 +4648,7 @@ class GameEngine {
 // ============================================================================
 
 window.arenaGame = null;
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initArena); else initArena();
-function initArena() { try { window.arenaGame = new GameEngine(); console.log('✅ Arena Professional initialized'); } catch (e) { console.error('Init error:', e); alert('Error: ' + e.message); } }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initArena); else initArena();function initArena() { try { window.arenaGame = new GameEngine(); console.log('✅ Arena Professional v6.0.9 initialized'); } catch (e) { console.error('Init error:', e); alert('Error: ' + e.message); } }
 window.addEventListener('beforeunload', () => { if (window.arenaGame) window.arenaGame = null; });
 </script>
 </body>
